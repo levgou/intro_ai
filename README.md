@@ -1,4 +1,4 @@
-# intro_ai
+# introai
 
 FIXME: description
 
@@ -10,7 +10,7 @@ Download from http://example.com/FIXME.
 
 FIXME: explanation
 
-    $ java -jar intro_ai-0.1.0-standalone.jar [args]
+    $ java -jar introai-0.1.0-standalone.jar [args]
 
 ## Options
 

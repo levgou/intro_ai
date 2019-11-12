@@ -1,3 +1,3 @@
-# Introduction to intro_ai
+# Introduction to introai
 
 TODO: write [great documentation](http://jacobian.org/writing/what-to-write/)
