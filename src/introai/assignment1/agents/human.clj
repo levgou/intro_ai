@@ -4,7 +4,6 @@
             [introai.utils.collections :refer [in?]]
             [ubergraph.core :as uber]
             [introai.assignment1.operators :as op]
-            [introai.assignment1.graph-description :as gd]
             ))
 
 

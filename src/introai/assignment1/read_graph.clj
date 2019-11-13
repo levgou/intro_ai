@@ -67,11 +67,13 @@
 
 (defn graph-props-from-list
   [g-list]
-  {
-   :num-nodes (parse-num-nodes g-list)
-   :nodes     (parse-nodes g-list)
-   :edges     (parse-edges g-list)
-   })
+  (let [nodes (parse-nodes g-list)]
+    {
+     :num-nodes (parse-num-nodes g-list)
+     :shelters  (map :name (filter :has-shelter nodes))
+     :nodes     nodes
+     :edges     (parse-edges g-list)
+     }))
 
 (defn list-of-edge-vectors
   [g-props]

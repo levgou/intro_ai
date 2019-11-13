@@ -30,7 +30,7 @@
           ((partial put-people-shelter graph-desc))
           ((partial pick-up-people graph-desc))))))
 
-(defn partial-edge [graph-desc state dest_str]
+(defn partial-edge [graph-desc state dest]
   (partial edge
            graph-desc
-           (gd/find-edge graph-desc (:agent-node state) (Integer. dest_str))))
+           (gd/find-edge graph-desc (:agent-node state) (Integer. dest))))
