@@ -6,6 +6,7 @@
   :dependencies [
                  [org.clojure/clojure "1.10.0"]
                  [ubergraph "0.8.1"]
+                 [org.clojure/core.incubator "0.1.4"]
                  ]
   :main ^:skip-aot intro-ai.core
   :target-path "target/%s"

@@ -1,7 +1,7 @@
-(ns intro-ai.core
-  (:gen-class))
+(ns introai.core
+  (:gen-class)
+  (:require [introai.assignment1.run-game :refer [run-from-file]]))
 
 (defn -main
-  "I don't do a whole lot ... yet."
   [& args]
-  (println "Hello, World!"))
+  (run-from-file "D:\\skool\\ai_intro\\test\\introai\\resources\\example_graph.aig"))

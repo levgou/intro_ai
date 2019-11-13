@@ -2,15 +2,8 @@
   (:gen-class)
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
-            [ubergraph.core :as uber]))
-
-
-(defrecord NodeInfo [name dead-line num-persons has-shelter])
-
-(defrecord EdgeInfo [name start end weight])
-
-(defrecord GraphDescription [structure props])
-
+            [ubergraph.core :as uber]
+            [introai.assignment1.graph-description :as desc]))
 
 (defn read-file-no-blank
   [file_abs]
@@ -44,7 +37,7 @@
 
 (defn parse-node
   [node-line]
-  (map->NodeInfo
+  (desc/map->NodeInfo
     {
      :name        (parse-int #"#V(\d+).*" node-line)        ;(last (re-matches #"#V(\d+).*" node-line))
      :dead-line   (parse-int #".*D(\d+).*" node-line)
@@ -59,7 +52,7 @@
 
 (defn parse-edge
   [edge-line]
-  (map->EdgeInfo
+  (desc/map->EdgeInfo
     {
      :name   (parse-int #"#E(\d+).*" edge-line)
      :start  (parse-int #"#E\d+ (\d+).*" edge-line)
@@ -97,8 +90,4 @@
             read-file-no-blank
             remove-comments
             graph-props-from-list)]
-
-    map->GraphDescription {
-                           :props     g_props
-                           :structure (graph-from-props g_props)
-                           }))
+    (desc/->GraphDescription (graph-from-props g_props) g_props)))
