@@ -1,7 +1,9 @@
 (ns introai.assignment1.operators
   (:gen-class)
   (:require [introai.assignment1.game-state :as gs]
-            [introai.assignment1.graph-description :as gd]))
+            [introai.assignment1.graph-description :as gd]
+            [loom.graph :as graph]
+            ))
 
 (defn term [state]
   (assoc state :terminated true
@@ -31,6 +33,10 @@
           ((partial pick-up-people graph-desc))))))
 
 (defn partial-edge [graph-desc state dest]
-  (partial edge
-           graph-desc
-           (gd/find-edge graph-desc (:agent-node state) (Integer. dest))))
+  (let [dest-int (Integer. dest)
+        src-int (:agent-node state)
+        g (:structure graph-desc)]
+
+    (partial edge
+             graph-desc
+             {:src src-int :dest dest-int :weight (graph/weight g src-int dest-int)})))

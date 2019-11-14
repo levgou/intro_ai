@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [clojure.core.strint :refer [<<]]
             [introai.utils.collections :refer [in?]]
-            [ubergraph.core :as uber]
+            [loom.graph :as graph]
             [introai.assignment1.operators :as op]
             ))
 
@@ -14,7 +14,7 @@
 
 (defn user-choice [graph-desc state]
   (let [neighbors
-        (map str (uber/neighbors (:structure graph-desc) (:agent-node state)))]
+        (map str (graph/successors (:structure graph-desc) (:agent-node state)))]
     (print-choices state neighbors)
 
     (let [choice (read-line)]

@@ -2,7 +2,8 @@
   (:gen-class)
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
-            [ubergraph.core :as uber]
+            [loom.graph :as graph]
+            [loom.alg :as alg]
             [introai.assignment1.graph-description :as desc]))
 
 (defn read-file-no-blank
@@ -20,15 +21,13 @@
   [start collection]
   (filter #(str/starts-with? % start) collection))
 
-
 (defn parse-int
   [pattern line]
-  (Integer. (last (or (re-matches pattern line) '("0")))))
-
+  (Integer. (or (last (re-matches pattern line)) "0")))
 
 (defn name-to-record
   [records]
-  (into (hash-map) (map vector (map :name records) records)))
+  (zipmap (map :name records) records))
 
 (defn parse-num-nodes
   [g-list]
@@ -39,7 +38,7 @@
   [node-line]
   (desc/map->NodeInfo
     {
-     :name        (parse-int #"#V(\d+).*" node-line)        ;(last (re-matches #"#V(\d+).*" node-line))
+     :name        (parse-int #"#V(\d+).*" node-line)
      :dead-line   (parse-int #".*D(\d+).*" node-line)
      :num-persons (parse-int #".*P(\d+).*" node-line)
      :has-shelter (str/ends-with? node-line "S")
@@ -54,23 +53,23 @@
   [edge-line]
   (desc/map->EdgeInfo
     {
-     :name   (parse-int #"#E(\d+).*" edge-line)
-     :start  (parse-int #"#E\d+ (\d+).*" edge-line)
-     :end    (parse-int #"#E\d+ \d+ (\d+).*" edge-line)
+     :name (parse-int #"#E(\d+).*" edge-line)
+     :start (parse-int #"#E\d+ (\d+).*" edge-line)
+     :end (parse-int #"#E\d+ \d+ (\d+).*" edge-line)
      :weight (parse-int #".*W(\d+)" edge-line)
      }))
 
 (defn parse-edges
   [g-list]
-  (name-to-record (map parse-edge
-                       (filter-lines "#E" g-list))))
+  (name-to-record
+    (map parse-edge (filter-lines "#E" g-list))))
 
 (defn graph-props-from-list
   [g-list]
   (let [nodes (parse-nodes g-list)]
     {
      :num-nodes (parse-num-nodes g-list)
-     :shelters  (map :name (filter :has-shelter nodes))
+     :shelters  (vec (map :name (filter :has-shelter (vals nodes))))
      :nodes     nodes
      :edges     (parse-edges g-list)
      }))
@@ -79,11 +78,12 @@
   [g-props]
   (map
     #(vec (vals (select-keys % [:start :end :weight])))
-    (vals (g-props :edges))))
+    (vals (:edges g-props))))
 
 (defn graph-from-props
   [g-props]
-  (apply uber/graph (list-of-edge-vectors g-props)))
+  (let [edge-list (list-of-edge-vectors g-props)]
+    (apply graph/weighted-graph edge-list)))
 
 (defn read-graph-from-file
   [file_abs]

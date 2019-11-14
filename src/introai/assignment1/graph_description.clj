@@ -1,5 +1,5 @@
 (ns introai.assignment1.graph-description
-  (:require [ubergraph.core :as uber]))
+  (:gen-class))
 
 (defrecord NodeInfo [name dead-line num-persons has-shelter])
 
@@ -32,7 +32,3 @@
     (apply hash-map
            (apply concat
                   (map #(vals (select-keys % [:name :num-persons])) non-zero-nodes)))))
-
-(defn find-edge [graph-desc v1 v2]
-  (let [struct (:structure graph-desc)]
-    (into {:weight (uber/weight struct v1 v2)} (uber/find-edge struct v1 v2))))
