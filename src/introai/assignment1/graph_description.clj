@@ -32,3 +32,6 @@
     (apply hash-map
            (apply concat
                   (map #(vals (select-keys % [:name :num-persons])) non-zero-nodes)))))
+
+(defn remaining-nodes [{ppl-map :remaining-people}]
+  (keys ppl-map))
