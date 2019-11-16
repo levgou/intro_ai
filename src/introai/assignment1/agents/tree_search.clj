@@ -31,22 +31,24 @@
      ]))
 
 (defn traverse-tree
-  [fringe state-tree goal? expand]
+  [fringe state-tree goal? expand max-expand?]
   (let [src-node (peek fringe)]
 
-    (loop [[cur-fringe states] [fringe state-tree]]
+    (loop [[cur-fringe states] [fringe state-tree] num-expand 0]
 
       (let [min-node (peek cur-fringe) others (pop cur-fringe)]
-        (log/debug "Min Node: " (log/state-node min-node))
+        (log/debug "Min Node: " (log/state-node min-node) "Num expands: " num-expand)
 
         (if (nil? min-node)
-          [nil states]
+          [nil ##Inf num-expand states]
 
-          (if (goal? min-node)
+          (if (or (goal? min-node) (max-expand? num-expand))
             (do (log/debug "Goal: " (log/state-node min-node))
-                [(first-op states src-node min-node) states])
+                [(first-op states src-node min-node) (:g min-node) num-expand states])
 
-            (recur (state-expand expand others states min-node))))))))
+            (recur
+              (state-expand expand others states min-node)
+              (inc num-expand))))))))
 
 (defn init-fringe [fringe init-state]
   (-> init-state first-node (#(conj fringe %))))
@@ -55,10 +57,10 @@
   (graph/add-nodes state-tree (first initial-fringe)))
 
 (defn tree-search
-  [init-state fringe goal? state-tree expand]
+  [init-state fringe goal? state-tree expand max-expand?]
   (let [initial-fringe (init-fringe fringe init-state)
         initial-tree (init-tree state-tree initial-fringe)]
 
-    (let [[op state-tree]
-          (traverse-tree initial-fringe initial-tree goal? expand)]
-      op)))
+    (let [[op score num-expand state-tree]
+          (traverse-tree initial-fringe initial-tree goal? expand max-expand?)]
+      [op score num-expand])))

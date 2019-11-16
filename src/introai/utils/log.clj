@@ -32,6 +32,5 @@
 (def SUMMARY-FIELDS [:score :num-expands :time :saved :remaining-people :final-node :edges-traversed])
 
 (defn exe-summary [summary]
-  (println "\n\n")
   (print-table [:field :val]
                (map #(identity {:field % :val (% summary)}) SUMMARY-FIELDS)))

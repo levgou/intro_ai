@@ -25,5 +25,5 @@
 (defn interactive [graph-desc state]
   (let [choice (user-choice graph-desc state)]
     (if (= choice "e")
-      (op/partial-term graph-desc)
-      (op/partial-edge graph-desc state choice))))
+      [(op/partial-term graph-desc) -1 -1]
+      [(op/partial-edge graph-desc state choice) -1 -1])))

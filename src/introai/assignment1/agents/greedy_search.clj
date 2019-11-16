@@ -5,7 +5,7 @@
             [introai.assignment1.agents.game-funcs :refer [goal? gen-state-expander]]
             [shams.priority-queue :as pq]))
 
-(defn greedy-key [node] (- (:f node)))
+(defn greedy-key [node] (- (max (:h node) (:g node))))
 
 (defn make-greedy-fringe []
   (pq/priority-queue greedy-key))
@@ -17,4 +17,5 @@
     (make-greedy-fringe)
     goal?
     (graph/digraph)
-    (gen-state-expander graph-desc)))
+    (gen-state-expander graph-desc)
+    #(do % false)))
