@@ -42,5 +42,5 @@
   (let [next-node (find-next-node graph-desc state)]
     (log/debug "G - next node is " next-node)
     (if (nil? next-node)
-      op/term
+      (op/partial-term graph-desc)
       (op/partial-edge graph-desc state next-node))))

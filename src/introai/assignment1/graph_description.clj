@@ -35,3 +35,6 @@
 
 (defn remaining-nodes [{ppl-map :remaining-people}]
   (keys ppl-map))
+
+(defn all-people [state]
+  (->> state :remaining-people vals (apply +)))

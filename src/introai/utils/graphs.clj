@@ -13,14 +13,14 @@
    })
 
 (defn edge-from-state-target-node [game-graph state target-node]
-  ((let [src-node (:agent-node state)]
-     (edge-from-src-target-node game-graph src-node target-node))))
+  (let [src-node (:agent-node state)]
+    (edge-from-src-target-node game-graph src-node target-node)))
 
 (defn successors [graph-desc node]
   (graph/successors (:structure graph-desc) node))
 
 (defn state-successors [graph-desc state]
-  (successors (:structure graph-desc) (:agent-node state)))
+  (successors graph-desc (:agent-node state)))
 
 (defn predecessors [graph-desc node]
   (graph/predecessors (:structure graph-desc) node))

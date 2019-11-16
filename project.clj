@@ -7,6 +7,8 @@
                  [org.clojure/clojure "1.10.0"]
                  [aysylu/loom "1.0.2"]
                  [org.clojure/core.incubator "0.1.4"]
+                 [shams/priority-queue "0.1.2"]
+                 [nano-id "0.10.0"]
                  ]
   :main ^:skip-aot intro-ai.core
   :target-path "target/%s"
