@@ -54,3 +54,7 @@
     (partial edge
              graph-desc
              {:src src-int :dest dest-int :weight (graph/weight g src-int dest-int)})))
+
+(defrecord Oracle [knows-all state-transitions]
+  clojure.lang.IFn
+  (invoke [this state] (state-transitions state)))

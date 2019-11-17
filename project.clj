@@ -9,6 +9,7 @@
                  [org.clojure/core.incubator "0.1.4"]
                  [shams/priority-queue "0.1.2"]
                  [nano-id "0.10.0"]
+                 [org.clojure/tools.cli "0.4.2"]
                  ]
   :main ^:skip-aot intro-ai.core
   :target-path "target/%s"

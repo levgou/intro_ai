@@ -2,11 +2,17 @@
   (:gen-class)
   (:require [loom.graph :as graph]
             [introai.utils.log :as log]
+            [introai.utils.collections :refer [map-leading-items]]
             [clojure.core.strint :refer [<<]]
             [loom.alg :as alg]
-            ))
+            [introai.assignment1.operators :as op]))
 
 (defrecord StateNode [state op g h f])
+
+(defn make-oracle [state-tree src-node target-node]
+  (let [shortest-path (alg/shortest-path state-tree src-node target-node)]
+    (let [state-state-map (map-leading-items (map :state shortest-path))]
+      (op/->Oracle true state-state-map))))
 
 (defn make-node
   [{state :state op :op g :g h :h}]
@@ -42,10 +48,18 @@
         (if (nil? min-node)
           [nil ##Inf num-expand states]
 
-          (if (or (goal? min-node) (max-expand? num-expand))
-            (do (log/debug "Goal: " (log/state-node min-node))
-                [(first-op states src-node min-node) (:g min-node) num-expand states])
+          (cond
+            (goal? min-node)
+            (do
+              (log/debug "Goal: " (log/state-node min-node))
+              [(make-oracle states src-node min-node) (:g min-node) num-expand states])
 
+            (max-expand? num-expand)
+            (do
+              (log/debug "MAX-Expand: " (log/state-node min-node))
+              [(first-op states src-node min-node) (:g min-node) num-expand states])
+
+            :else
             (recur
               (state-expand expand others states min-node)
               (inc num-expand))))))))
@@ -58,6 +72,7 @@
 
 (defn tree-search
   [init-state fringe goal? state-tree expand max-expand?]
+
   (let [initial-fringe (init-fringe fringe init-state)
         initial-tree (init-tree state-tree initial-fringe)]
 

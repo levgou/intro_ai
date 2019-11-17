@@ -20,7 +20,7 @@
     goal?
     (graph/digraph)
     (gen-state-expander graph-desc)
-    #(< expand-limit %)))
+    #(<= expand-limit %)))
 
 (defn gen-rt-a-star-search [expand-limit]
   #(rt-a-star-search %1 %2 expand-limit))

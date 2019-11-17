@@ -5,6 +5,8 @@
 
 (defrecord EdgeInfo [name start end weight])
 
+(defrecord GraphProps [num-nodes shelters nodes edges time-modifier])
+
 (defrecord GraphDescription [structure props])
 
 (defn state-node-info [graph-desc state]
@@ -15,7 +17,7 @@
     (key state-node)))
 
 (defn time-over? [graph-desc state]
-  (let [deadline (state-node-info-piece graph-desc state :dead-line)]
+  (let [deadline (+ (state-node-info-piece graph-desc state :dead-line) (-> graph-desc :props :time-modifier))]
     (> (:time state) deadline)))
 
 (defn shelter? [graph-desc state]

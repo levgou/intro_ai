@@ -53,9 +53,9 @@
   [edge-line]
   (desc/map->EdgeInfo
     {
-     :name (parse-int #"#E(\d+).*" edge-line)
-     :start (parse-int #"#E\d+ (\d+).*" edge-line)
-     :end (parse-int #"#E\d+ \d+ (\d+).*" edge-line)
+     :name   (parse-int #"#E(\d+).*" edge-line)
+     :start  (parse-int #"#E\d+ (\d+).*" edge-line)
+     :end    (parse-int #"#E\d+ \d+ (\d+).*" edge-line)
      :weight (parse-int #".*W(\d+)" edge-line)
      }))
 
@@ -67,12 +67,14 @@
 (defn graph-props-from-list
   [g-list]
   (let [nodes (parse-nodes g-list)]
-    {
-     :num-nodes (parse-num-nodes g-list)
-     :shelters  (vec (map :name (filter :has-shelter (vals nodes))))
-     :nodes     nodes
-     :edges     (parse-edges g-list)
-     }))
+    (desc/map->GraphProps
+      {
+       :num-nodes     (parse-num-nodes g-list)
+       :shelters      (vec (map :name (filter :has-shelter (vals nodes))))
+       :nodes         nodes
+       :edges         (parse-edges g-list)
+       :time-modifier 0
+       })))
 
 (defn list-of-edge-vectors
   [g-props]
