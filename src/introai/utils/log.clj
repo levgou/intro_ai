@@ -10,7 +10,7 @@
   (apply println (cons "INFO:  " things)))
 
 (defn debug [& things]
-  (apply println (cons "DEBG:  " things))
+  ;(apply println (cons "DEBG:  " things))
   nil
   )
 

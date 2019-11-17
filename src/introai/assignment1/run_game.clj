@@ -19,6 +19,7 @@
    ["-T" "--T T-VAL" :default 0 :id :T :parse-fn #(Float. %)]
    ["-L" "--L L-VAL" :default 0 :id :L :parse-fn #(Integer. %)]
    ["-f" "--file-name FILE-NAME" "path to runtime file" :id :file-name]
+   ["-h" "--help"]
    ])
 
 (defn opt-parser [args]

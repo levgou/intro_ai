@@ -11,6 +11,6 @@
                  [nano-id "0.10.0"]
                  [org.clojure/tools.cli "0.4.2"]
                  ]
-  :main ^:skip-aot intro-ai.core
+  :main ^:skip-aot introai.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})
