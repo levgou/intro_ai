@@ -22,8 +22,8 @@
         choice
         (user-choice graph-desc state)))))
 
-(defn interactive [graph-desc state]
+(defn interactive [graph-desc state count-expands]
   (let [choice (user-choice graph-desc state)]
     (if (= choice "e")
-      [(op/partial-term graph-desc) -1 -1]
-      [(op/partial-edge graph-desc state choice) -1 -1])))
+      [(op/partial-term graph-desc) (count-expands 1)]
+      [(op/partial-edge graph-desc state choice) (count-expands 1)])))

@@ -15,11 +15,12 @@
    dead,
    terminated,
    remaining-people,
+   score,
    id,
    ])
 
 (defn initial-state [graph-people]
-  (GameState. 1, 0, 0, 0, {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0}, E/NOT-TERMINATED, graph-people (nano-id 10)))
+  (GameState. 1, 0, 0, 0, {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0}, E/NOT-TERMINATED, graph-people ##Inf (nano-id 10)))
 
 (defn progress-time [edge state]
   (assoc state :time (+ (:time state) (:weight edge))))

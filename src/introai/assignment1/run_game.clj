@@ -48,31 +48,42 @@
     "rt-a-star" [(gen-rt-a-star-search L) (gen-penalize T L)]
     ))
 
-(defn main-loop [graph-desc init-state choose-op time-penalize]
-  (loop [state init-state
-         score 0
-         iteration 0
-         total-num-expand 0
-         cur-graph-desc graph-desc
-         prev-op {}]
 
-    (log/info (<< "(~{iteration})> ~{(into {} state)}"))
-    (if (gs/term? state)
-      [state score iteration total-num-expand cur-graph-desc]
+(defrecord RtStats [iteration num-expands])
+(defn iter+ [rt-stats] (update rt-stats :iteration inc))
+(defn expand-counter [rt-stats] #(update rt-stats :num-expands + %))
 
-      (let [time-updated-gdesc
-            (if (:knows-all prev-op) cur-graph-desc (time-penalize cur-graph-desc))]
+(defn main-loop [graph-desc init-state choose-op time-penalizer]
 
-        (let [[op cur-score num-expand]
-              (if (:knows-all prev-op) [prev-op score 0] (choose-op time-updated-gdesc state))]
+  (let [init-stats (RtStats. 0 0)]
+    (loop [state init-state
+           stats init-stats
+           cur-graph-desc graph-desc
+           prev-op {}]
 
-          (recur
-            (op state)
-            cur-score
-            (inc iteration)
-            (+ total-num-expand num-expand)
-            time-updated-gdesc
-            op))))))
+      (log/info (<< "(~{iteration})> ~{(into {} state)}"))
+      (if (gs/term? init-state)
+        [init-state stats graph-desc]
+
+        (if (:knows-all prev-op)
+          (recur (prev-op state) (iter+ stats) cur-graph-desc prev-op)
+
+          (let [time-updated-gdesc (time-penalizer cur-graph-desc)]
+            (let [[op stats] (choose-op time-updated-gdesc state (expand-counter stats))]
+              (recur (op state) (iter+ stats) time-updated-gdesc op))))
+
+
+        ;(let [time-updated-gdesc (time-penalizer cur-graph-desc)]
+        ;
+        ;  (let [[op cur-score num-expand]
+        ;        (if (:knows-all prev-op) [prev-op score 0] (choose-op time-updated-gdesc state))]
+        ;
+        ;    (recur
+        ;      (op state)
+        ;      (iter+ stats)
+        ;      time-updated-gdesc
+        ;      op)))
+        ))))
 
 (defn run [graph-desc alg time-penalize]
   (log/info "START")

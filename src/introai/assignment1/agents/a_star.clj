@@ -13,18 +13,19 @@
   (pq/priority-queue a-star-key))
 
 (defn rt-a-star-search
-  [graph-desc state expand-limit]
+  [graph-desc state count-expands expand-limit]
   (tree-search
     state
     (make-a-star-fringe)
     goal?
     (graph/digraph)
     (gen-state-expander graph-desc)
+    count-expands
     #(<= expand-limit %)))
 
 (defn gen-rt-a-star-search [expand-limit]
-  #(rt-a-star-search %1 %2 expand-limit))
+  #(rt-a-star-search %1 %2 %3 expand-limit))
 
 (defn a-star-search
-  [graph-desc state]
-  (rt-a-star-search graph-desc state MAX_EXPAND-LIMIT))
+  [graph-desc state count-expands]
+  (rt-a-star-search graph-desc state count-expands MAX_EXPAND-LIMIT))

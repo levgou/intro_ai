@@ -11,11 +11,12 @@
   (pq/priority-queue greedy-key))
 
 (defn greedy-tree-search
-  [graph-desc state]
+  [graph-desc state count-expands]
   (tree-search
     state
     (make-greedy-fringe)
     goal?
     (graph/digraph)
     (gen-state-expander graph-desc)
+    count-expands
     #(do % false)))
