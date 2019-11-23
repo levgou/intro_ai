@@ -2,10 +2,9 @@
   (:gen-class)
   (:require [loom.graph :as graph]
             [introai.assignment1.agents.tree-search :refer [tree-search]]
-            [introai.assignment1.agents.game-funcs :refer [goal? gen-state-expander]]
+            [introai.assignment1.agents.game-funcs :refer [goal? gen-state-expander MAX_EXPAND-LIMIT]]
             [shams.priority-queue :as pq]))
 
-(def MAX_EXPAND-LIMIT 100000)
 
 (defn a-star-key [node] (- (:f node)))
 

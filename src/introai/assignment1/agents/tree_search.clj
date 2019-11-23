@@ -46,18 +46,18 @@
         (log/debug "Min Node: " (log/state-node min-node) "Num expands: " num-expand)
 
         (if (nil? min-node)
-          [nil ##Inf num-expand]
+          [nil num-expand]
 
           (cond
             (goal? min-node)
             (do
               (log/debug "Goal: " (log/state-node min-node))
-              [(make-oracle states src-node min-node) (:g min-node) num-expand])
+              [(make-oracle states src-node min-node) num-expand])
 
             (max-expand? num-expand)
             (do
               (log/debug "MAX-Expand: " (log/state-node min-node))
-              [(first-op states src-node min-node) (:g min-node) num-expand])
+              [(first-op states src-node min-node) num-expand])
 
             :else
             (recur
@@ -76,6 +76,6 @@
   (let [initial-fringe (init-fringe fringe init-state)
         initial-tree (init-tree state-tree initial-fringe)]
 
-    (let [[op score num-expand]
+    (let [[op num-expand]
           (traverse-tree initial-fringe initial-tree goal? expand max-expand?)]
-      [op score (count-expands num-expand)])))
+      [op (count-expands num-expand)])))

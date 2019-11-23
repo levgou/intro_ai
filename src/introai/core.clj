@@ -7,8 +7,8 @@
 (def HELP-MESSAGE "
 Command line args:
    -f, --file-name      <Filename>        path to runtime file
-   -a, --alg            <ALG - NAME>      one of:   [greedy, greedy-search, a-star, rt-a-star]
-   -T, --T              <float>           float value for T
+   -a, --alg            <ALG - NAME>      one of:   [user, greedy, greedy-search, a-star, rt-a-star]
+   -T, --T              <float>           float value for T [0, 0.000001, 0.01]
    -L, --L              <int>             max expands for RT A*
 ")
 

@@ -8,6 +8,9 @@
     [introai.assignment1.game-state :as gs]
     [introai.utils.enums :as E]))
 
+
+(def MAX_EXPAND-LIMIT 100000)
+
 (def gen-edge gutils/edge-from-state-target-node)
 
 (defn closest-shelter [graph-struct src shelters]
@@ -48,16 +51,10 @@
            (gen-edge graph-struct state next-node)
            state))
 
-(defn calc-final-g [state]
-  (+
-    (if (= (:terminated state) E/TERMINATED-UNSAFELY) 2 0)
-    (-> state :dead E/DIED-IN-CITY)
-    (* 2 (-> state :dead E/DIED-WITH-AGENT))))
-
 (defn term-state [graph-desc state]
   (let [terminated-state (op/term graph-desc state)]
     {
-     :g     (calc-final-g terminated-state)
+     :g     (:score terminated-state)
      :h     0
      :state terminated-state
      :op    (op/partial-term graph-desc)

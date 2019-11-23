@@ -29,7 +29,8 @@
       ":g ~{(:g state-node)}, :h ~{(:h state-node)}, :f ~{f}}"
       )))
 
-(def SUMMARY-FIELDS [:score :num-expands :time :saved :remaining-people :final-node :edges-traversed])
+(def SUMMARY-FIELDS [:score :num-expands :time :saved :remaining-people
+                     :final-node :num-edges-traversed :time-penalties])
 
 (defn exe-summary [summary]
   (print-table [:field :val]

@@ -13,11 +13,19 @@
       (update E/DIED-IN-CITY + (gd/all-people state))
       (update E/DIED-WITH-AGENT + (:carrying state))))
 
+(defn calc-final-g [state]
+  (+
+    (if (= (:terminated state) E/TERMINATED-UNSAFELY) 2 0)
+    (-> state :dead E/DIED-IN-CITY)
+    (* 2 (-> state :dead E/DIED-WITH-AGENT))))
+
 (defn term [graph-desc state]
-  (assoc state :terminated (if (gd/shelter? graph-desc state) E/TERMINATED-SAFELY E/TERMINATED-UNSAFELY)
-               :dead (update-dead-count state)
-               :carrying 0
-               :id (nano-id 10)))
+  (let [final-state
+        (assoc state :terminated (if (gd/shelter? graph-desc state) E/TERMINATED-SAFELY E/TERMINATED-UNSAFELY)
+                     :dead (update-dead-count state)
+                     :carrying 0
+                     :id (nano-id 10))]
+    (assoc final-state :score (calc-final-g final-state))))
 
 (defn partial-term [graph-desc]
   (partial term graph-desc))
