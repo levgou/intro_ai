@@ -2,11 +2,12 @@
   (:gen-class)
   (:require
     [introai.assignment1.operators :as op]
+    [clojure.core.strint :refer [<<]]
     [introai.utils.graphs :as gutils]
     [introai.assignment1.graph-description :as gd]
     [introai.utils.log :as log]
     [introai.assignment1.game-state :as gs]
-    [introai.utils.enums :as E]))
+    ))
 
 
 (def MAX_EXPAND-LIMIT 100000)
@@ -14,27 +15,25 @@
 (def gen-edge gutils/edge-from-state-target-node)
 
 (defn closest-shelter [graph-struct src shelters]
-  (apply min-key second (map
-                          #(vector % (gutils/dijkstra-dist graph-struct src %))
-                          shelters)))
+  (apply min-key second (map #(vector % (gutils/dijkstra-dist graph-struct src %))
+                             shelters)))
 
 (defn people-can-save-at
-  [
-   {graph-struct :structure, {shelters :shelters nodes :nodes} :props}
+  [{graph-struct :structure, {shelters :shelters nodes :nodes} :props}
    {src :agent-node remaining-people :remaining-people cur-time :time}
-   dest
-   ]
+   dest]
 
-  (let [
-        [_ dist-close-shelter] (closest-shelter graph-struct src shelters)
-        dead-line (:dead-line (nodes dest))
-        ]
+  (let [[closest-shelter dist-close-shelter] (closest-shelter graph-struct dest shelters)
+        dest-dead-line (:dead-line (nodes dest))
+        shelter-dead-line (:dead-line (nodes closest-shelter))
+        distance-to-dest (gutils/dijkstra-dist graph-struct src dest)]
 
-    (if (< dead-line (+ cur-time
-                        (gutils/dijkstra-dist graph-struct src dest)
-                        dist-close-shelter))
-      0
-      (remaining-people dest))))
+    (let [savable-people
+          (if (or (< dest-dead-line (+ cur-time distance-to-dest))
+                  (< shelter-dead-line (+ cur-time distance-to-dest dist-close-shelter)))
+            0
+            (remaining-people dest))]
+      savable-people)))
 
 (defn heuristic [graph-desc state]
   (let [savable-people
