@@ -15,3 +15,6 @@
   (into {} (map-to-vec
              #(apply vector %)
              (partition 2 1 (concat collection '(nil))))))
+
+(defn dissoc-in [mapping keys]
+  (update-in mapping (butlast keys) dissoc (last keys)))

@@ -1,6 +1,6 @@
-(ns introai.assignment1.agents.greedy
+(ns introai.assignment2.agents.greedy
   (:gen-class)
-  (:require [introai.assignment1.operators :as op]
+  (:require [introai.assignment2.operators :as op]
             [clojure.core.strint :refer [<<]]
             [introai.utils.log :as log]
             [loom.alg :as alg]
@@ -20,10 +20,10 @@
     next))
 
 (defn node-on-way-to-people [graph-desc state]
-  (log/debug "looking for people to save")
-  (if (empty? (:remaining-people state))
+  (log/debug "looking for people to save out of: " (:remaining-people graph-desc))
+  (if (empty? (:remaining-people graph-desc))
     nil
-    (next-node graph-desc state (keys (:remaining-people state)))))
+    (next-node graph-desc state (keys (:remaining-people graph-desc)))))
 
 (defn node-on-way-to-shelter [graph-desc state]
   (let [shelters (-> graph-desc :props :shelters)]
@@ -38,9 +38,9 @@
     (node-on-way-to-people graph-desc state)
     (node-on-way-to-shelter graph-desc state)))
 
-(defn greedy [graph-desc state count-expands]
+(defn greedy [graph-desc state cur-time]
   (let [next-node (find-next-node graph-desc state)]
     (log/debug "G - next node is " next-node)
     (if (nil? next-node)
-      [(op/partial-term graph-desc) (count-expands 1)]
-      [(op/partial-edge graph-desc state next-node) (count-expands 1)])))
+      (op/make-term (:agent-node state))
+      (op/make-edge graph-desc state next-node cur-time))))

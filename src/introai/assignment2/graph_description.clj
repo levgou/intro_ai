@@ -1,4 +1,4 @@
-(ns introai.assignment1.graph-description
+(ns introai.assignment2.graph-description
   (:gen-class))
 
 (defrecord NodeInfo [name dead-line num-persons has-shelter])
@@ -7,7 +7,7 @@
 
 (defrecord GraphProps [num-nodes shelters nodes edges time-modifier])
 
-(defrecord GraphDescription [structure props])
+(defrecord GraphDescription [structure props remaining-people])
 
 (defn state-node-info [graph-desc state]
   (-> graph-desc :props :nodes (#(% (:agent-node state)))))
@@ -16,21 +16,26 @@
   (let [state-node (state-node-info graph-desc state)]
     (key state-node)))
 
-(defn time-over? [graph-desc state]
-  (let [deadline (+ (state-node-info-piece graph-desc state :dead-line) (-> graph-desc :props :time-modifier))]
-    (> (:time state) deadline)))
+(defn time-over? [graph-desc state cur-time]
+  (let [deadline (+ (state-node-info-piece graph-desc state :dead-line)
+                    (-> graph-desc :props :time-modifier))]
+    (> cur-time deadline)))
 
 (defn shelter? [graph-desc state]
   (state-node-info-piece graph-desc state :has-shelter))
 
 (defn people-num [graph-desc state]
-  (state-node-info-piece graph-desc state :num-persons))
+  (or
+    ((:remaining-people graph-desc) (:agent-node state))
+    0)
+  ;(state-node-info-piece graph-desc state :num-persons)
+  )
 
-(defn non-empty-nodes [graph-desc]
-  (remove #(zero? (:num-persons %)) (-> graph-desc :props :nodes vals)))
+(defn non-empty-nodes [nodes-map]
+  (remove #(zero? (:num-persons %)) (vals nodes-map)))
 
-(defn people-map [graph-desc]
-  (let [non-zero-nodes (non-empty-nodes graph-desc)]
+(defn people-map [nodes-map]
+  (let [non-zero-nodes (non-empty-nodes nodes-map)]
     (apply hash-map
            (apply concat
                   (map #(vals (select-keys % [:name :num-persons])) non-zero-nodes)))))
@@ -38,5 +43,5 @@
 (defn remaining-nodes [{ppl-map :remaining-people}]
   (keys ppl-map))
 
-(defn all-people [state]
-  (->> state :remaining-people vals (apply +)))
+(defn all-people [graph-desc]
+  (->> graph-desc :remaining-people vals (apply +)))

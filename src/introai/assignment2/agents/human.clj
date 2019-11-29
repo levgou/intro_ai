@@ -1,9 +1,9 @@
-(ns introai.assignment1.agents.human
+(ns introai.assignment2.agents.human
   (:gen-class)
   (:require [clojure.core.strint :refer [<<]]
             [introai.utils.collections :refer [in?]]
             [loom.graph :as graph]
-            [introai.assignment1.operators :as op]
+            [introai.assignment2.operators :as op]
             ))
 
 
@@ -22,8 +22,8 @@
         choice
         (user-choice graph-desc state)))))
 
-(defn interactive [graph-desc state count-expands]
+(defn interactive [graph-desc state cur-time]
   (let [choice (user-choice graph-desc state)]
     (if (= choice "e")
-      [(op/partial-term graph-desc) (count-expands 1)]
-      [(op/partial-edge graph-desc state choice) (count-expands 1)])))
+      (op/make-term (:agent-node state))
+      (op/make-edge graph-desc state choice cur-time))))

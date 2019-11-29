@@ -1,10 +1,10 @@
-(ns introai.assignment1.read-graph
+(ns introai.assignment2.read-graph
   (:gen-class)
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
             [loom.graph :as graph]
             [loom.alg :as alg]
-            [introai.assignment1.graph-description :as desc]))
+            [introai.assignment2.graph-description :as desc]))
 
 (defn read-file-no-blank
   [file_abs]
@@ -66,14 +66,14 @@
 
 (defn graph-props-from-list
   [g-list]
-  (let [nodes (parse-nodes g-list)]
+  (let [node-names (parse-nodes g-list)]
     (desc/map->GraphProps
       {
-       :num-nodes     (parse-num-nodes g-list)
-       :shelters      (vec (map :name (filter :has-shelter (vals nodes))))
-       :nodes         nodes
-       :edges         (parse-edges g-list)
-       :time-modifier 0
+       :num-nodes        (parse-num-nodes g-list)
+       :shelters         (vec (map :name (filter :has-shelter (vals node-names))))
+       :nodes            node-names
+       :edges            (parse-edges g-list)
+       :time-modifier    0                                  ; todo: could do bad that its here
        })))
 
 (defn list-of-edge-vectors
@@ -94,4 +94,8 @@
             read-file-no-blank
             remove-comments
             graph-props-from-list)]
-    (desc/->GraphDescription (graph-from-props g_props) g_props)))
+
+    (desc/->GraphDescription
+      (graph-from-props g_props)
+      g_props
+      (desc/people-map (:nodes g_props)))))

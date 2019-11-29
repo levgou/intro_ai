@@ -10,21 +10,43 @@
   (apply println (cons "INFO:  " things)))
 
 (defn debug [& things]
-  ;(apply println (cons "DEBG:  " things))
+  (apply println (cons "DEBG:  " things))
   nil
   )
 
-(defn op-description [op]
+(defn op-description [unresolved-op]
+  (let [op (:op unresolved-op)]
+    {
+     :agent-name   (-> unresolved-op :agent :name)
+     :name         (:op-type op)
+     :src-dest     [(:src op) (:dest op)]
+     :resolve-time (:resolve-time unresolved-op)
+     }))
+
+(defn agent-description [agent]
   {
-   :name (:op-type op)
-   :src-dest [(:src op) (:dest op)]
-   :resolve-time (:resolve-time op)
+   :name   (:name agent)
+   :vertex (-> agent :state :agent-node)
+   :state (-> agent :state :terminated)
+   :carry (-> agent :state :carrying)
    })
 
-(defn iteration [time idle-agents ops-in-progress]
-  (let [agent-state-map (reduce  #(assoc %1 :name (%2 -> :state :teminated)) {}  idle-agents)
-        ops-desc (map op-description ops-in-progress)]
-    (info (<< "(~{time})> idles: ~{idle-agent-state-map} ; ops: ~{ops-desc}"))))
+(defn iteration [time idle-agents ops-in-progress graph-desc]
+  (let [agents-desc (into '() (map agent-description idle-agents))
+        ops-desc (into '() (map op-description ops-in-progress))
+        remaining (:remaining-people graph-desc)]
+    (info (<< "(~{time})> just-updated-agents: ~{agents-desc} ; next-ops: ~{ops-desc} ; remaining: ~{remaining}"))))
+
+(defn name-n-state [agent]
+  (assoc (into {} (:state agent)) :name (:name agent)))
+
+(defn end [graph-desc agents]
+  (let [agents-info (into [] (map name-n-state agents))]
+
+    (info "----------- E-N-D -----------")
+    (info "Remaining people: " (:remaining-people graph-desc))
+    (doseq [agent-info agents-info] (info agent-info))
+    (info "----------- D-N-E -----------")))
 
 (defn state-node
   [state-node]

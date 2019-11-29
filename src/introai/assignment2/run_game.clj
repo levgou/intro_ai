@@ -1,9 +1,9 @@
-(ns introai.assignment1.run-game
+(ns introai.assignment2.run-game
   (:gen-class)
-  (:require [introai.assignment1.game-state :as gs]
-            [introai.assignment1.graph-description :as gd]
-            [introai.assignment1.read-graph :as rg]
-            [introai.assignment1.agents.agent :refer [gen-agent]]
+  (:require [introai.assignment2.game-state :as gs]
+            [introai.assignment2.graph-description :as gd]
+            [introai.assignment2.read-graph :as rg]
+            [introai.assignment2.agents.agent :refer [gen-agent]]
             [clojure.core.strint :refer [<<]]
             [introai.utils.log :as log]
             [clojure.tools.cli :refer [parse-opts]]
@@ -45,77 +45,63 @@
   [{choose-op :choose-op time-penalizer :time-penalizer :as agent}
    graph-desc cur-time]
   (let [time-updated-gdesc (time-penalizer graph-desc)]
-    (let [[op resolve-time] (choose-op time-updated-gdesc (:state agent) cur-time)]
-      (OpInProgress. agent op resolve-time))))
-
-(defn main-loop1 [graph-desc init-state agent]
-  (let [init-stats (RtStats. 0 0)
-        {time-penalizer :time-penalizer choose-op :choose-op} agent]
-
-    (loop [state init-state
-           stats init-stats
-           cur-graph-desc graph-desc
-           prev-op {}]
-
-      (log/info (<< "(~{(:iteration stats)})> ~{(into {} state)}"))
-      (if (gs/term? state)
-        [state stats cur-graph-desc]
-
-        (if (:knows-all prev-op)
-          (recur (prev-op state) (iter+ stats) cur-graph-desc prev-op)
-
-          (let [time-updated-gdesc (time-penalizer cur-graph-desc)]
-            (let [[op stats] (choose-op time-updated-gdesc state (expand-counter stats))]
-              (recur (op state) (iter+ stats) time-updated-gdesc op))))))))
+    (let [op (choose-op time-updated-gdesc (:state agent) cur-time)]
+      (OpInProgress. agent op (:resolve-time op)))))
 
 (defn agent-term? [agent] (gs/term? (:state agent)))
 (defn agent-active? [agent] (not (agent-term? agent)))
 
 (defn update-agent-state
-  [[updated-agents graph-desc] {op :op agent :agent}]
-  (let [[new-state new-graph-desc] (op (:state agent) graph-desc)]
-    [(conj updated-agents (assoc agent :state new-state))
-     new-graph-desc]))
+  [cur-time [graph-desc updated-agents] {op :op agent :agent}]
+  (let [[new-graph-desc new-state] (op graph-desc (:state agent) cur-time)]
+    [new-graph-desc
+     (conj updated-agents (assoc agent :state new-state))]))
 
 (defn gen-ops-in-progress
   [agents graph-desc cur-time]
   (map #(gen-deferred-op % graph-desc cur-time)
        agents))
 
-(defn main-loop [graph-desc agents]
+(defn resolve-ops [graph-desc ops cur-time]
+  (reduce (partial update-agent-state cur-time) [graph-desc '()] ops))
 
-  (loop [cur-graph-desc graph-desc
-         idle-agents agents
-         ops-in-progress []
-         cur-time 0]
+(defn resolve-ready-ops [graph-desc ops cur-time]
+  (let [resolvable-ops (filter #(resolvable? % cur-time) ops)]
+    (resolve-ops graph-desc resolvable-ops cur-time)))
 
-    (log/iteration cur-time idle-agents ops-in-progress)
+(defn main-loop
+  [graph-desc agents]
 
-    (if (every? empty? [(filter agent-active? idle-agents) ops-in-progress])
-      [cur-graph-desc idle-agents]
+  (let [initial-ops (gen-ops-in-progress agents graph-desc 0)]
+    (loop [cur-graph-desc graph-desc
+           ops-in-progress initial-ops
+           cur-time 0]
 
-      (let [resolvable-ops (filter #(resolvable? % cur-time) ops-in-progress)]
-        (let [[agents-new-state updated-graph-desc]
-              (reduce update-agent-state [cur-graph-desc '()] resolvable-ops)]
+      (let [[updated-graph-desc agents-new-state] (resolve-ready-ops cur-graph-desc ops-in-progress cur-time)
+            not-ready-ops (remove #(resolvable? % cur-time) ops-in-progress)]
 
-          (recur [updated-graph-desc
-                  agents-new-state
-                  (gen-ops-in-progress idle-agents updated-graph-desc cur-time)
-                  (inc cur-time)]))))))
+        (if (every? empty? [(filter agent-active? agents-new-state) not-ready-ops])
+          [updated-graph-desc agents-new-state]
 
+          (let [new-ops (gen-ops-in-progress agents-new-state updated-graph-desc cur-time)]
+            (let [remaining-ops (concat not-ready-ops new-ops)]
 
-(defn run [graph-desc agent]
+              (log/iteration cur-time agents-new-state remaining-ops updated-graph-desc)
+              (recur updated-graph-desc
+                     remaining-ops
+                     (inc cur-time)))))))))
+
+(defn run [graph-desc agents]
   (log/info "START")
-  (let [[final-state stats final-graph-desc]
-        (main-loop
-          graph-desc
-          (gs/initial-state (gd/people-map graph-desc))
-          agent)]
+  (let [[final-graph-desc final-state-agents]
+        (main-loop graph-desc agents)]
 
-    (log/info "END:" (into {} final-state))
-    (log/exe-summary (gen-summary final-state stats final-graph-desc))))
+    (log/end final-graph-desc final-state-agents)
+    ;(log/exe-summary (gen-summary final-state stats final-graph-desc))
+    ))
 
 (defn run-from-opts [opts]
-  (let [graph-desc (rg/read-graph-from-file (:file-name opts))
-        agent (gen-agent opts)]
-    (run graph-desc agent)))
+  (let [graph-desc (rg/read-graph-from-file (:file-name opts))]
+    (let [agent1 (gen-agent opts (gs/initial-state) "Bob")
+          agent2 (gen-agent opts (gs/initial-state) "Alice")]
+      (run graph-desc [agent1 agent2]))))
