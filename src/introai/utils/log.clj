@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [clojure.core.strint :refer [<<]]
             [clojure.pprint :refer [print-table]]
-            ))
+            [introai.utils.enums :as E]))
 
 (defn spy [thing] (do (println "SPYY: " thing) thing))
 
@@ -13,6 +13,18 @@
   ;(apply println (cons "DEBG:  " things))
   nil
   )
+
+(defn op-description [op]
+  {
+   :name (:op-type op)
+   :src-dest [(:src op) (:dest op)]
+   :resolve-time (:resolve-time op)
+   })
+
+(defn iteration [time idle-agents ops-in-progress]
+  (let [agent-state-map (reduce  #(assoc %1 :name (%2 -> :state :teminated)) {}  idle-agents)
+        ops-desc (map op-description ops-in-progress)]
+    (info (<< "(~{time})> idles: ~{idle-agent-state-map} ; ops: ~{ops-desc}"))))
 
 (defn state-node
   [state-node]
