@@ -4,12 +4,13 @@
             [clojure.core.strint :refer [<<]]
             [introai.utils.log :as log]
             [loom.alg :as alg]
-            ))
+            [introai.assignment2.game-state :as gs]))
 
 
 (defn shortest-path-to-any [graph start-node destinations]
   (log/debug (<< "shortest path from ~{start-node} to any of ~{destinations}"))
   (let [shortest (apply min-key second (map #(alg/dijkstra-path-dist graph start-node %) destinations))]
+    (log/debug (<< "Shortest path is: ~{(first shortest)} with weight: ~{(second shortest)}"))
     (first shortest)))
 
 (defn next-node [graph-desc state targets]
@@ -38,9 +39,10 @@
     (node-on-way-to-people graph-desc state)
     (node-on-way-to-shelter graph-desc state)))
 
-(defn greedy [graph-desc state cur-time]
-  (let [next-node (find-next-node graph-desc state)]
-    (log/debug "G - next node is " next-node)
+(defn greedy [graph-desc di-state agent]
+  (let [next-node (find-next-node graph-desc (gs/state-of di-state agent))]
     (if (nil? next-node)
-      (op/make-term (:agent-node state))
-      (op/make-edge graph-desc state next-node cur-time))))
+      (op/make-term (gs/state-piece-of di-state agent :agent-node))
+      (op/make-edge graph-desc
+                    (gs/state-of di-state agent)
+                    next-node))))

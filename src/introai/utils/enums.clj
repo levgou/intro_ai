@@ -9,3 +9,4 @@
 
 (def T_EDGE :edge-type)
 (def T_TERM :term-type)
+(def T_ID :ident-type)

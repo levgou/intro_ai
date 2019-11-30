@@ -2,66 +2,47 @@
   (:gen-class)
   (:require [clojure.core.strint :refer [<<]]
             [clojure.pprint :refer [print-table]]
-            [introai.utils.enums :as E]))
+            [introai.utils.enums :as E]
+            [introai.assignment2.game-state :as gs]))
 
-(defn spy [thing] (do (println "SPYY: " thing) thing))
+(defn spy [thing] (do
+                    (println "SPYY: " thing)
+                    thing))
 
 (defn info [& things]
   (apply println (cons "INFO:  " things)))
 
+(defn info-nl [& things]
+  (apply info things)
+  (println ""))
+
 (defn debug [& things]
-  (apply println (cons "DEBG:  " things))
+  ;(apply println (cons "DEBG:  " things))
   nil
   )
 
-(defn op-description [unresolved-op]
-  (let [op (:op unresolved-op)]
-    {
-     :agent-name   (-> unresolved-op :agent :name)
-     :name         (:op-type op)
-     :src-dest     [(:src op) (:dest op)]
-     :resolve-time (:resolve-time unresolved-op)
-     }))
+(defn two-state
+  [{remaining-people :remaining-people} {alice-state :state1 bob-state :state2 t :time id :id}]
+  (info "Remaining people after move: " remaining-people)
+  (info (<< "  * (~{t} - ~{id} - Alice)> ~{(into {} alice-state)}"))
+  (info-nl (<< "  * (~{t} - ~{id} - B_o_b)> ~{(into {} bob-state)}")))
 
-(defn agent-description [agent]
-  {
-   :name   (:name agent)
-   :vertex (-> agent :state :agent-node)
-   :state (-> agent :state :terminated)
-   :carry (-> agent :state :carrying)
-   })
-
-(defn iteration [time idle-agents ops-in-progress graph-desc]
-  (let [agents-desc (into '() (map agent-description idle-agents))
-        ops-desc (into '() (map op-description ops-in-progress))
-        remaining (:remaining-people graph-desc)]
-    (info (<< "(~{time})> just-updated-agents: ~{agents-desc} ; next-ops: ~{ops-desc} ; remaining: ~{remaining}"))))
+(defn turn [{t :time id :id :as di-state} agents-order]
+  (let [agent-name (:name (first agents-order))
+        agent-state (gs/state-piece-of di-state (first agents-order) :terminated)]
+    (info (<< "(~{t} - ~{id})> [~{agent-name}] is now playing with state [~{agent-state}]"))))
 
 (defn name-n-state [agent]
-  (assoc (into {} (:state agent)) :name (:name agent)))
+  {(:name agent) (into {} (:state agent))})
 
-(defn end [graph-desc agents]
-  (let [agents-info (into [] (map name-n-state agents))]
+(defn end [graph-desc di-state]
+  (let [agents-info (into [] (map name-n-state [{:name "Alice" :state (:state1 di-state)}
+                                                {:name "Bob" :state (:state2 di-state)}]))]
 
     (info "----------- E-N-D -----------")
     (info "Remaining people: " (:remaining-people graph-desc))
     (doseq [agent-info agents-info] (info agent-info))
     (info "----------- D-N-E -----------")))
-
-(defn state-node
-  [state-node]
-  (let [state (:state state-node) f (+ (:g state-node) (:h state-node))]
-    (<<
-      "Node[~{(:id state)}]"
-      "{:agent-node ~{(:agent-node state)}, "
-      ":time ~{(:time state)}, "
-      ":carrying ~{(:carrying state)}, "
-      ":saved ~{(:saved state)}, "
-      ":dead ~{(:dead state)}, "
-      ":term? ~{(:terminated state)}, "
-      ":remaining ~{(:remaining-people state)}, "
-      ":g ~{(:g state-node)}, :h ~{(:h state-node)}, :f ~{f}}"
-      )))
 
 (def SUMMARY-FIELDS [:score :num-expands :time :saved :remaining-people
                      :final-node :num-edges-traversed :time-penalties])

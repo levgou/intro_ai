@@ -73,7 +73,6 @@
        :shelters         (vec (map :name (filter :has-shelter (vals node-names))))
        :nodes            node-names
        :edges            (parse-edges g-list)
-       :time-modifier    0                                  ; todo: could do bad that its here
        })))
 
 (defn list-of-edge-vectors

@@ -4,10 +4,9 @@
     [introai.assignment2.operators :as op]
     [clojure.core.strint :refer [<<]]
     [introai.utils.graphs :as gutils]
-    [introai.assignment2.graph-description :as gd]
     [introai.utils.log :as log]
     [introai.assignment2.game-state :as gs]
-    ))
+    [introai.assignment2.graph-description :as gd]))
 
 
 (def MAX_EXPAND-LIMIT 100000)
@@ -73,16 +72,33 @@
 ;(defn edge-states [graph-desc neighbours state]
 ;  (map #(successor-state-map graph-desc % state) neighbours))
 ;
-;(defn expand
-;  [graph-desc state]
-;  (if (gs/term? state)
-;    {}
-;    (let [neighbours (gutils/state-successors graph-desc state)]
-;      (let [next-states (conj (edge-states graph-desc neighbours state) (term-state graph-desc state))]
-;        (doseq [next-state-map next-states]
-;          (log/debug ">" (log/state-node next-state-map)))
-;        next-states))))
-;
+
+(defn agent-term? [cur-di-state agent] (gs/term? (gs/state-of cur-di-state agent)))
+(defn agent-active? [cur-di-state agent] (not (agent-term? cur-di-state agent)))
+
+(defn all-agents-term? [di-state agents]
+  (every? #(agent-term? di-state %) agents))
+
+
+(defn edge-ops [graph-desc di-state agent neighbours]
+  (if (gd/time-over? graph-desc di-state agent)
+    []
+    (let [agent-state (gs/state-of di-state agent)]
+      (map #(op/make-edge graph-desc agent-state %) neighbours))))
+
+(defn gen-next-ops
+  [graph-desc di-state agent]
+  (if (agent-term? di-state agent)
+    [(op/make-id)]
+    (let [neighbours (gutils/state-successors graph-desc (gs/state-of di-state agent))]
+      (let [next-ops
+            (conj (edge-ops graph-desc di-state agent neighbours)
+                  (op/make-term (gs/state-piece-of di-state agent :agent-node))
+                  )]
+        ;(doseq [next-state-map next-states]
+        ;  (log/debug ">" (log/state-node next-state-map)))
+        next-ops))))
+
 ;(defn gen-state-expander
 ;  [graph-desc]
 ;  #(expand graph-desc %))
