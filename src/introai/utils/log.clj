@@ -5,8 +5,9 @@
             [introai.utils.enums :as E]
             [introai.assignment2.game-state :as gs]))
 
-(defn spy [thing] (do
-                    (println "SPYY: " thing)
+
+(defn spy [thing & others] (do
+                    (println "SPYY: " thing " - " others)
                     thing))
 
 (defn info [& things]

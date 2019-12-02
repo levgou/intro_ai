@@ -41,7 +41,7 @@
   [{choose-op :choose-op time-penalizer :time-penalizer :as agent}
    graph-desc di-state agent-order]
   (let [time-updated-di-state (time-penalizer di-state agent)]
-    (let [op (choose-op graph-desc time-updated-di-state agent agent-order)]
+    (let [op (choose-op graph-desc time-updated-di-state agent-order)]
       (assoc-in (op graph-desc time-updated-di-state agent) [1 :id] (nano-id 10)))))
 
 (defn main-loop

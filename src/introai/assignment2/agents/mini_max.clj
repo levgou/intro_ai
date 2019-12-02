@@ -16,11 +16,35 @@
 (def INF ##Inf)
 (def -INF (- ##Inf))
 
-(defn term-search? [di-state agent-order]
+(defrecord MiniMaxState [graph-desc di-state agent-order]
+  Object
+  (toString [x] (str (into {} x))))
+(defmethod print-method MiniMaxState [x ^java.io.Writer w] (.write w (str x)))
+
+(defn minimizers-turn [minimax-state] (:agent-order minimax-state))
+(defn maximizers-turn [minimax-state] (repeat 2 (first (:agent-order minimax-state))))
+
+(defrecord MiniMaxNodeProps [alpha beta depth]
+  Object
+  (toString [x] (str (into {} x))))
+(defmethod print-method MiniMaxNodeProps [x ^java.io.Writer w] (.write w (str x)))
+
+(defn both-agents-terminated [di-state agent-order]
+  (log/debug "Bot agents terminated!")
   (and
     (agent-term? di-state (first agent-order))
     (agent-term? di-state (second agent-order))
     ))
+
+(def MAX-DEPTH 13)
+(defn cutoff-minimax [minimax-props]
+  (log/debug "Depth cutoff!")
+  (< MAX-DEPTH (:depth minimax-props)))
+
+(defn term-search? [{di-state :di-state agent-order :agent-order} minimax-props]
+  (or
+    (both-agents-terminated di-state agent-order)
+    (cutoff-minimax minimax-props)))
 
 (defn calc-agent-score [state]
   (-
@@ -31,71 +55,76 @@
     (* 2 (-> state :dead E/DIED-WITH-AGENT))
     ))
 
+(defn next-ops [{graph-desc :graph-desc di-state :di-state} op-agent]
+  (into []
+        (map #(identity {:op %})
+             (gen-next-ops graph-desc di-state op-agent))
+        )
+  )
 
-(defn stat-eval [di-state agent]
+(defn stat-eval [{di-state :di-state} agent]
   (calc-agent-score (gs/state-of di-state agent)))
 
 (defn assoc-op-with-res [graph-desc di-state agent map-with-op]
   (let [[new-graph-desc new-di-state] ((:op map-with-op) graph-desc di-state agent)]
     (assoc map-with-op :graph-desc new-graph-desc :di-state new-di-state)))
 
+(defn assoc-ops-with-res
+  [{graph-desc :graph-desc di-state :di-state} op-agent ops]
+  (into []
+        (map #(assoc-op-with-res graph-desc di-state op-agent %) ops)
+        )
+  )
+
 (defn assoc-res-with-min-val
-  [{op :op graph-desc :graph-desc di-state :di-state :as m} agent-order alpha beta]
-  (let [min-val (min-value graph-desc di-state agent-order alpha beta)]
+  [{op :op graph-desc :graph-desc di-state :di-state :as m} agent-order minimax-props]
+  (let [min-val (min-value (MiniMaxState. graph-desc di-state agent-order) minimax-props)]
     (assoc m :min-val min-val)))
 
 (defn assoc-res-with-max-val
-  [{op :op graph-desc :graph-desc di-state :di-state :as m} agent-order alpha beta]
-  (let [max-val (max-value graph-desc di-state agent-order alpha beta)]
+  [{op :op graph-desc :graph-desc di-state :di-state :as m} agent-order minimax-props]
+
+  (let [max-val (max-value (MiniMaxState. graph-desc di-state agent-order) minimax-props)]
     (assoc m :max-val max-val)))
 
-(defn prune-next-states-max [agent-order results alpha beta]
+(defn prune-next-states-max
+  [{agent-order :agent-order} results {alpha :alpha beta :beta depth :depth}]
+
   (loop [[res & others] results
          max-val -INF
          cur-alpha alpha]
 
-    (let [v (max max-val (:min-val (assoc-res-with-min-val res agent-order cur-alpha beta)))]
+    (let [v (max max-val (:min-val
+                           (assoc-res-with-min-val
+                             res agent-order (MiniMaxNodeProps. cur-alpha beta (inc depth)))))]
 
       (if (or (>= v beta) (nil? others))
         v
         (recur others v (max cur-alpha v))))))
 
 (defn max-value
-  [graph-desc di-state agent-order alpha beta]
+  [minimax-state minimax-props]
 
-  (let [[agent op-agent] [(first agent-order) (first agent-order)]]
+  (let [[agent op-agent] (maximizers-turn minimax-state)]
 
-    (if (term-search? di-state agent-order)
-      (let [score (stat-eval di-state agent)]
-        ;(log/info "MAX LEAF! - " score "  -  " (into {} (gs/state-of di-state agent)))
+    (if (term-search? minimax-state minimax-props)
+      (let [score (stat-eval minimax-state agent)]
         score)
 
-      (let [ops (map #(identity {:op %}) (gen-next-ops graph-desc di-state op-agent))]
-        (let [ops-and-results (map #(assoc-op-with-res graph-desc di-state op-agent %) ops)]
-          (prune-next-states-max agent-order ops-and-results alpha beta)
+      (let [ops (next-ops minimax-state op-agent)]
+        (let [ops-and-results (assoc-ops-with-res minimax-state op-agent ops)]
+          (prune-next-states-max minimax-state ops-and-results minimax-props))))))
 
+(defn prune-next-states-min
+  [{agent-order :agent-order} results {alpha :alpha beta :beta depth :depth}]
 
-
-          ;(let [maps-with-min-vals (into [] (map #(assoc-res-with-min-val % agent-order) ops-and-results))]
-
-          ;(log/info ">>> ######## max-value ###########################################################################")
-          ;(doseq [m maps-with-min-vals]
-          ;  (log/info (:min-val m) (into {} (:op m))))
-          ;(log/info "<<< ######## max-value ###########################################################################")
-
-
-          ;(let [min-vals (into [] (map :min-val maps-with-min-vals))]
-          ;  (apply max min-vals)))
-          ;
-
-          )))))
-
-(defn prune-next-states-min [agent-order results alpha beta]
   (loop [[res & others] results
          min-val INF
          cur-beta beta]
 
-    (let [v (min min-val (:max-val (assoc-res-with-max-val res agent-order alpha cur-beta)))]
+    (let [v (min min-val (:max-val
+                           (assoc-res-with-max-val
+                             res agent-order (MiniMaxNodeProps. alpha cur-beta (inc depth)))))]
 
       (if (or (<= v alpha) (nil? others))
         v
@@ -104,39 +133,29 @@
 (defn min-value
   "The other player plays ->
    will try to choose the min for the first player"
-  [graph-desc di-state agent-order alpha beta]
+  [minimax-state minimax-props]
 
-  (let [[agent op-agent] agent-order]
+  (let [[agent op-agent] (minimizers-turn minimax-state)]
 
-    (if (term-search? di-state agent-order)
-      (let [score (stat-eval di-state agent)]
-        ;(log/info "MIN LEAF! - " score "  -  " (into {} (gs/state-of di-state agent)))
+    (if (term-search? minimax-state minimax-props)
+      (let [score (stat-eval minimax-state agent)]
         score)
 
-      (let [ops (into [] (map #(identity {:op %}) (gen-next-ops graph-desc di-state op-agent)))]
-        (let [ops-and-results (into [] (map #(assoc-op-with-res graph-desc di-state op-agent %) ops))]
-
-          (prune-next-states-min agent-order ops-and-results alpha beta)
-          ;(let [maps-with-max-vals (into [] (map #(assoc-res-with-max-val % agent-order) ops-and-results))]
-
-          ;(log/info ">>> $$$ min-value $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-          ;(doseq [m maps-with-max-vals]
-          ;  (log/info (:max-val m) (into {} (:op m))))
-          ;(log/info "<<< $$$ min-value $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
+      (let [ops (next-ops minimax-state op-agent)]
+        (let [ops-and-results (assoc-ops-with-res minimax-state op-agent ops)]
+          (prune-next-states-min minimax-state ops-and-results minimax-props))))))
 
 
-          ;(let [max-vals (into [] (map :max-val maps-with-max-vals))]
-          ;  (apply min max-vals)))
-          ;
-          )))))
+(defn mini-max [graph-desc di-state agent-order]
+  (let [initial-minimax-state (MiniMaxState. graph-desc di-state agent-order)
+        initial-minimax-props (MiniMaxNodeProps. -INF INF 0)
+        op-agent (first agent-order)]
 
+    (let [ops (next-ops initial-minimax-state op-agent)]
+      (let [ops-and-results (assoc-ops-with-res initial-minimax-state op-agent ops)]
+        (let [maps-with-min-vals (into [] (map #(assoc-res-with-min-val % agent-order initial-minimax-props) ops-and-results))]
 
-(defn mini-max [graph-desc di-state agent agent-order]
-  (let [ops (map #(identity {:op %}) (gen-next-ops graph-desc di-state agent))]
-    (let [ops-and-results (map #(assoc-op-with-res graph-desc di-state agent %) ops)]
-      (let [maps-with-min-vals (into [] (map #(assoc-res-with-min-val % agent-order -INF INF) ops-and-results))]
+          (doseq [m maps-with-min-vals]
+            (log/debug "&>>" (:min-val m) (into {} (:op m))))
 
-        (doseq [m maps-with-min-vals]
-          (log/debug "&>>" (:min-val m) (into {} (:op m))))
-
-        (:op (apply max-key :min-val maps-with-min-vals))))))
+          (:op (apply max-key :min-val maps-with-min-vals)))))))

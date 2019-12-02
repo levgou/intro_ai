@@ -16,7 +16,12 @@
    score,
    time-modifier
    id,
-   ])
+   ]
+  Object
+  (toString [gs] (str (into {} gs)))
+  )
+
+(defmethod print-method GameState [gs ^java.io.Writer w] (.write w (str gs)))
 
 (defrecord TwoAgentState
   [
@@ -24,7 +29,12 @@
    state2
    time
    id
-   ])
+   ]
+  Object
+  (toString [tas] (str (into {} tas)))
+  )
+
+(defmethod print-method TwoAgentState [tas ^java.io.Writer w] (.write w (str tas)))
 
 (defn state-of [di-state agent]
   (if (= (:name agent) "Alice")
