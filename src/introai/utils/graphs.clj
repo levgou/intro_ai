@@ -5,7 +5,7 @@
             [loom.attr :as g-attr]
             [clojure.core.strint :refer [<<]]
             [introai.utils.collections :refer [pairwise-collection]]
-            ))
+            [introai.utils.log :as log]))
 
 
 (defn edge-from-src-target-node [game-graph src-node target-node]
@@ -40,6 +40,19 @@
 (defn unique-edges [g]
   (into #{} (map sort (graph/edges g))))
 
+(defn shortest-path-dist
+  "Returns shortest path and its length"
+  [g src dest]
+  ((juxt identity #(dec (count %))) (alg/shortest-path g src dest)))
+
+(defn shortest-path-len
+  [g src dest]
+  (second (shortest-path-dist g src dest)))
+
+(defn node-mid-edge? [gdesc node]
+  (true?
+    (g-attr/attr (:structure gdesc) node :mid-edge)))
+
 (defn edge-map [g [src dest]]
   {
    :src    src
@@ -57,26 +70,42 @@
   (concat [src] (mid-vertices edge) [dest]))
 
 (defn unique-weighted-edges [g]
-  (let [edges (unique-edges g)]
+  (let [edges (graph/edges g)]
     (map #(edge-map g %) edges)))
 
 (defn edges-to-add-for-edge [edge]
   (let [p (new-path edge)]
-    (pairwise-collection p)))
+    (println edge)
+    (log/spy (pairwise-collection p))))
 
-(defn new-nodes [g new-edges]
+(defn new-nodes-only [g new-edges]
   (let [old-nodes (graph/nodes g)]
     (remove #(contains? old-nodes %) (into #{} (flatten new-edges)))))
 
-(defn edges-to-add [g]
+(defn break-down-edges [g]
   (let [new-edges (apply concat (map edges-to-add-for-edge (unique-weighted-edges g)))]
     new-edges))
 
 (defn dense-graph [g]
-  (let [new-edges (edges-to-add g)]
-    (let [nodes (new-nodes g new-edges)]
+  (let [new-edges (break-down-edges g)]
+    (let [new-nodes (new-nodes-only g new-edges)]
       (println new-edges)
-      (println nodes)
-      (-> g
-          (#(apply graph/add-edges % new-edges))
-          (g-attr/add-attr-to-nodes :mid-edge true nodes)))))
+      (println new-nodes)
+      (-> (apply graph/digraph new-edges)
+          (g-attr/add-attr-to-nodes :mid-edge true new-nodes)))))
+
+(defn dense? [graph-desc]
+  (:dense graph-desc))
+
+(defn weight [graph-desc src-int dest-int]
+  (if (dense? graph-desc) 1 (graph/weight (:structure graph-desc) src-int dest-int)))
+
+(defn mid-nodes [{struct :structure :as graph-desc}]
+  (filter (partial node-mid-edge? graph-desc) (graph/nodes struct)))
+
+(defn mid-node-in-edge [graph-desc edge-vec]
+  (any?
+    (map (partial node-mid-edge? graph-desc) edge-vec)))
+
+(defn mid-edges [{struct :structure :as graph-desc}]
+  (filter (partial mid-node-in-edge graph-desc) (graph/edges struct)))

@@ -17,7 +17,8 @@
              (partition 2 1 (concat collection '(nil))))))
 
 (defn pairwise-collection [col]
-  (into [] (drop-last (map-leading-items col))))
+  (vec
+    (filter (every-pred first second) (map-leading-items col))))
 
 (defn dissoc-in [mapping keys]
   (update-in mapping (butlast keys) dissoc (last keys)))

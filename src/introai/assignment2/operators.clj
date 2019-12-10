@@ -6,8 +6,9 @@
             [loom.graph :as graph]
             [nano-id.core :refer [nano-id]]
             [introai.utils.collections :refer [in?]]
-            [introai.utils.enums :as E]
-            [introai.utils.log :as log]))
+            [introai.utils.const :as E]
+            [introai.utils.log :as log]
+            [introai.utils.graphs :as gutils]))
 
 (defn update-dead-count [{dead-map :dead :as state} graph-desc]
   (-> dead-map
@@ -62,7 +63,7 @@
   clojure.lang.IFn
 
   (invoke [this graph-desc di-state agent]
-        [graph-desc di-state]))
+    [graph-desc di-state]))
 
 (defn make-id []
   (Ident. E/T_ID))
@@ -93,22 +94,18 @@
 
       (if-not (gd/time-over? graph-desc di-state agent)
         (do (log/debug (<< "[~{(:name agent)}] Got to node [~{dest}] at time [~{(:time new-di-state)}]"))
-          (pick-up-people
-            graph-desc
-            (put-people-shelter graph-desc new-di-state agent)
-            agent))
+            (pick-up-people
+              graph-desc
+              (put-people-shelter graph-desc new-di-state agent)
+              agent))
 
         ((make-term dest) graph-desc new-di-state agent)))))
 
-(defn make-edge [graph-desc state dest]
-  (let [dest-int (Integer. dest)
-        src-int (:agent-node state)
-        g (:structure graph-desc)]
-
-    (Edge. (graph/weight g src-int dest-int)
-           src-int
-           dest-int
-           E/T_EDGE)))
+(defn make-edge [graph-desc {src :agent-node} dest]
+  (Edge. (gutils/weight graph-desc src dest)
+         src
+         dest
+         E/T_EDGE))
 
 (defrecord Oracle [knows-all state-transitions]
   clojure.lang.IFn

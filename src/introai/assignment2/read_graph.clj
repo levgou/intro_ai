@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [loom.graph :as graph]
             [loom.alg :as alg]
+            [introai.utils.graphs :as gutils]
             [introai.assignment2.graph-description :as desc]))
 
 (defn read-file-no-blank
@@ -21,9 +22,13 @@
   [start collection]
   (filter #(str/starts-with? % start) collection))
 
+(defn parse-str-num
+  [pattern line]
+  (or (last (re-matches pattern line)) "0"))
+
 (defn parse-int
   [pattern line]
-  (Integer. (or (last (re-matches pattern line)) "0")))
+  (Integer. (parse-str-num pattern line)))
 
 (defn name-to-record
   [records]
@@ -38,7 +43,7 @@
   [node-line]
   (desc/map->NodeInfo
     {
-     :name        (parse-int #"#V(\d+).*" node-line)
+     :name        (parse-str-num #"#V(\d+).*" node-line)
      :dead-line   (parse-int #".*D(\d+).*" node-line)
      :num-persons (parse-int #".*P(\d+).*" node-line)
      :has-shelter (str/ends-with? node-line "S")
@@ -53,9 +58,9 @@
   [edge-line]
   (desc/map->EdgeInfo
     {
-     :name   (parse-int #"#E(\d+).*" edge-line)
-     :start  (parse-int #"#E\d+ (\d+).*" edge-line)
-     :end    (parse-int #"#E\d+ \d+ (\d+).*" edge-line)
+     :name   (parse-str-num #"#E(\d+).*" edge-line)
+     :start  (parse-str-num #"#E\d+ (\d+).*" edge-line)
+     :end    (parse-str-num #"#E\d+ \d+ (\d+).*" edge-line)
      :weight (parse-int #".*W(\d+)" edge-line)
      }))
 
@@ -69,10 +74,10 @@
   (let [node-names (parse-nodes g-list)]
     (desc/map->GraphProps
       {
-       :num-nodes        (parse-num-nodes g-list)
-       :shelters         (vec (map :name (filter :has-shelter (vals node-names))))
-       :nodes            node-names
-       :edges            (parse-edges g-list)
+       :num-nodes (parse-num-nodes g-list)
+       :shelters  (vec (map :name (filter :has-shelter (vals node-names))))
+       :nodes     node-names
+       :edges     (parse-edges g-list)
        })))
 
 (defn list-of-edge-vectors
@@ -94,7 +99,9 @@
             remove-comments
             graph-props-from-list)]
 
-    (desc/->GraphDescription
-      (graph-from-props g_props)
-      g_props
-      (desc/people-map (:nodes g_props)))))
+    (desc/make-dense
+      (desc/->GraphDescription
+        (graph-from-props g_props)
+        g_props
+        (desc/people-map (:nodes g_props))
+        ))))

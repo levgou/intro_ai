@@ -13,34 +13,48 @@
 ;
 ;(def gen-edge gutils/edge-from-state-target-node)
 ;
-;(defn closest-shelter [graph-struct src shelters]
-;  (apply min-key second (map #(vector % (gutils/dijkstra-dist graph-struct src %))
-;                             shelters)))
-;
-;(defn people-can-save-at
-;  [{graph-struct :structure, {shelters :shelters nodes :nodes} :props}
-;   {src :agent-node remaining-people :remaining-people cur-time :time}
-;   dest]
-;
-;  (let [[closest-shelter dist-close-shelter] (closest-shelter graph-struct dest shelters)
-;        dest-dead-line (:dead-line (nodes dest))
-;        shelter-dead-line (:dead-line (nodes closest-shelter))
-;        distance-to-dest (gutils/dijkstra-dist graph-struct src dest)]
-;
-;    (let [savable-people
-;          (if (or (< dest-dead-line (+ cur-time distance-to-dest))
-;                  (< shelter-dead-line (+ cur-time distance-to-dest dist-close-shelter)))
-;            0
-;            (remaining-people dest))]
-;      savable-people)))
-;
-;(defn heuristic [graph-desc state]
-;  (let [savable-people
-;        (apply + (map
-;                   #(people-can-save-at graph-desc state %)
-;                   (gd/remaining-nodes state)))]
-;    (- (gd/all-people state) savable-people)))
-;
+(defn closest-shelter [graph-struct src shelters]
+  (apply min-key second (map #(vector % (gutils/shortest-path-len graph-struct src %))
+                             shelters)))
+
+(defn can-reach-dest-on-time? [graph-desc node cur-time distance-to-dest]
+  (< (gd/node-dead-line graph-desc node)
+     (+ cur-time distance-to-dest)))
+
+(defn can-reach-shelter-on-time? [{graph-struct :structure {shelters :shelters nodes :nodes} :props}
+                                  node cur-time distance-to-dest]
+
+  (let [[closest-shelter dist-close-shelter] (closest-shelter graph-struct node shelters)
+        shelter-dead-line (:dead-line (nodes closest-shelter))]
+
+    (< shelter-dead-line (+ cur-time distance-to-dest dist-close-shelter))))
+
+(defn people-can-save-at
+  [{graph-struct :structure remaining-people :remaining-people :as graph-desc}
+   {src :agent-node}
+   cur-time
+   dest]
+
+  (let [distance-to-dest (gutils/shortest-path-len graph-struct src dest)
+
+        savable-people
+        (if (and (can-reach-dest-on-time? graph-desc dest cur-time distance-to-dest)
+                 (can-reach-shelter-on-time? graph-desc dest cur-time distance-to-dest))
+          (remaining-people dest)
+          0)]
+
+    savable-people))
+
+(defn heuristic [graph-desc state cur-time]
+  (let [savable-people
+        (apply + (map
+                   #(people-can-save-at graph-desc state cur-time %)
+                   (gd/remaining-nodes graph-desc)))]
+    savable-people))
+
+(defn agent-heuristic [graph-desc di-state agent]
+  (heuristic graph-desc (gs/state-of di-state agent) (:time di-state)))
+
 ;(defn goal? [{state :state}]
 ;  (gs/term? state))
 ;
@@ -75,6 +89,9 @@
 
 (defn agent-term? [cur-di-state agent] (gs/term? (gs/state-of cur-di-state agent)))
 (defn agent-active? [cur-di-state agent] (not (agent-term? cur-di-state agent)))
+(defn mid-edge? [graph-desc di-state agent] (->> (gs/state-of di-state agent)
+                                                 :agent-node
+                                                 (gutils/node-mid-edge? graph-desc)))
 
 (defn all-agents-term? [di-state agents]
   (every? #(agent-term? di-state %) agents))
@@ -86,10 +103,17 @@
     (let [agent-state (gs/state-of di-state agent)]
       (map #(op/make-edge graph-desc agent-state %) neighbours))))
 
+(defn only-edge-op [graph-desc di-state agent]
+  (op/make-edge graph-desc di-state
+                (first (gutils/state-successors graph-desc (gs/state-of di-state agent)))))
+
 (defn gen-next-ops
   [graph-desc di-state agent]
-  (if (agent-term? di-state agent)
-    [(op/make-id)]
+  (cond
+    (agent-term? di-state agent) [(op/make-id)]
+    (mid-edge? graph-desc di-state agent) [(only-edge-op graph-desc di-state agent)]
+
+    :else
     (let [neighbours (gutils/state-successors graph-desc (gs/state-of di-state agent))]
       (let [next-ops
             (conj (edge-ops graph-desc di-state agent neighbours)

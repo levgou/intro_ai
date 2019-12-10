@@ -2,7 +2,7 @@
   (:gen-class)
   (:require [clojure.core.strint :refer [<<]]
             [nano-id.core :refer [nano-id]]
-            [introai.utils.enums :as E]
+            [introai.utils.const :as E]
             [introai.utils.collections :refer [in? dissoc-in]]
             ))
 
@@ -14,7 +14,6 @@
    dead,
    terminated,
    score,
-   time-modifier
    id,
    ]
   Object
@@ -50,7 +49,7 @@
 
 (defn initial-di-state []
   (let [new-state
-        (GameState. 1, 0, 0, {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0}, E/NOT-TERMINATED, 0, 0, (nano-id 10))]
+        (GameState. "1", 0, 0, {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0}, E/NOT-TERMINATED, 0, (nano-id 10))]
     (TwoAgentState. new-state new-state 0 (nano-id 10))))
 
 (defn progress-time [di-state time-amount]

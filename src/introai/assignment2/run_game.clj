@@ -14,8 +14,6 @@
   [
    ["-a" "--alg ALG-NAME" "One of: [greedy, greedy-search, a-star, rt-a-star]"
     :id :alg-name]
-   ["-T" "--T T-VAL" :default 0 :id :T :parse-fn #(Float. %)]
-   ["-L" "--L L-VAL" :default 0 :id :L :parse-fn #(Integer. %)]
    ["-f" "--file-name FILE-NAME" "path to runtime file" :id :file-name]
    ["-h" "--help"]
    ])
@@ -32,17 +30,15 @@
    :saved               (:saved final-state)
    :remaining-people    (:remaining-people final-state)
    :final-node          (:agent-node final-state)
-   :time-penalties      (-> final-graph-desc :props :time-modifier)
    })
 
 
 
 (defn perform-next-op
-  [{choose-op :choose-op time-penalizer :time-penalizer :as agent}
+  [{choose-op :choose-op :as agent}
    graph-desc di-state agent-order]
-  (let [time-updated-di-state (time-penalizer di-state agent)]
-    (let [op (choose-op graph-desc time-updated-di-state agent-order)]
-      (assoc-in (op graph-desc time-updated-di-state agent) [1 :id] (nano-id 10)))))
+  (let [op (choose-op graph-desc di-state agent-order)]
+    (assoc-in (op graph-desc di-state agent) [1 :id] (nano-id 10))))
 
 (defn main-loop
   [graph-desc di-state agents]

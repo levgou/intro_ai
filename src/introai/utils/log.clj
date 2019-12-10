@@ -2,12 +2,12 @@
   (:gen-class)
   (:require [clojure.core.strint :refer [<<]]
             [clojure.pprint :refer [print-table]]
-            [introai.utils.enums :as E]
+            [introai.utils.const :as E]
             [introai.assignment2.game-state :as gs]))
 
 
 (defn spy [thing & others] (do
-                    (println "SPYY: " thing " - " others)
+                    (println "SPYY: " thing (if others (<< " - ~{others}") ""))
                     thing))
 
 (defn info [& things]
@@ -46,7 +46,7 @@
     (info "----------- D-N-E -----------")))
 
 (def SUMMARY-FIELDS [:score :num-expands :time :saved :remaining-people
-                     :final-node :num-edges-traversed :time-penalties])
+                     :final-node :num-edges-traversed])
 
 (defn exe-summary [summary]
   (print-table [:field :val]

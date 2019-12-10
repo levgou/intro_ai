@@ -1,4 +1,4 @@
-(ns introai.utils.enums)
+(ns introai.utils.const)
 
 (def NOT-TERMINATED :not-terminated)
 (def TERMINATED-SAFELY :terminated-safely)
@@ -10,3 +10,6 @@
 (def T_EDGE :edge-type)
 (def T_TERM :term-type)
 (def T_ID :ident-type)
+
+(def INF ##Inf)
+(def -INF (- ##Inf))
