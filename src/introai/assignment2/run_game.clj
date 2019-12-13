@@ -21,26 +21,25 @@
 (defn opt-parser [args]
   (:options (parse-opts args CMD-OPTS)))
 
-(defn gen-summary [final-state rt-stats final-graph-desc]
-  {
-   :score               (:score final-state)
-   :num-expands         (:num-expands rt-stats)
-   :num-edges-traversed (:iteration rt-stats)
-   :time                (:time final-state)
-   :saved               (:saved final-state)
-   :remaining-people    (:remaining-people final-state)
-   :final-node          (:agent-node final-state)
-   })
-
+;(defn gen-summary [final-state rt-stats final-graph-desc]
+;  {
+;   :score               (:score final-state)
+;   :num-expands         (:num-expands rt-stats)
+;   :num-edges-traversed (:iteration rt-stats)
+;   :time                (:time final-state)
+;   :saved               (:saved final-state)
+;   :remaining-people    (:remaining-people final-state)
+;   :final-node          (:agent-node final-state)
+;   })
 
 
 (defn perform-next-op
   [{choose-op :choose-op :as agent}
    graph-desc di-state agent-order]
   (let [op (choose-op graph-desc di-state agent-order)]
-    (assoc-in (op graph-desc di-state agent) [1 :id] (nano-id 10))))
+    (assoc-in (op graph-desc di-state agent) [1 :id] (nano-id 7))))
 
-(defn main-loop
+(defn main-loop2
   [graph-desc di-state agents]
   (log/two-state graph-desc di-state)
 
@@ -51,17 +50,39 @@
     (if (all-agents-term? cur-di-state agents)
       [cur-graph-desc cur-di-state]
 
-      (let [cur-agent (first agent-order)]
+      (let [[first-agent second-agent] agent-order]
         (log/turn cur-di-state agent-order)
 
-        (if (agent-term? cur-di-state cur-agent)
+        (if (agent-term? cur-di-state first-agent)
           (recur (reverse agent-order) cur-graph-desc cur-di-state)
 
           (let [[new-graph-desc new-di-state]
-                (perform-next-op cur-agent cur-graph-desc cur-di-state agent-order)]
+                (perform-next-op first-agent cur-graph-desc cur-di-state agent-order)]
 
             (log/two-state new-graph-desc new-di-state)
             (recur (reverse agent-order) new-graph-desc new-di-state)))))))
+
+(defn agent-alter-world [graph-desc di-state agent-order]
+  (let [agent (first agent-order)]
+    (if-not (agent-term? di-state agent)
+      (perform-next-op agent graph-desc di-state agent-order)
+      [graph-desc di-state])))
+
+(defn main-loop
+  [graph-desc di-state agents]
+  (log/two-state graph-desc di-state)
+
+  (loop [cur-graph-desc graph-desc
+         cur-di-state di-state]
+
+    (if (all-agents-term? cur-di-state agents)
+      [cur-graph-desc cur-di-state]
+
+      (let [[graph-desc1 di-state1] (agent-alter-world cur-graph-desc cur-di-state agents)
+            [graph-desc2 di-state2] (agent-alter-world graph-desc1 di-state1 (reverse agents))]
+
+        (log/two-state graph-desc2 di-state2)
+        (recur graph-desc2 (gs/progress-time di-state2 1))))))
 
 (defn run [graph-desc di-state agents]
   (log/info "START")

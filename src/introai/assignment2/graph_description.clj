@@ -7,7 +7,11 @@
             [introai.utils.const :refer [INF]]
             ))
 
-(defrecord NodeInfo [name dead-line num-persons has-shelter])
+(defrecord NodeInfo [name dead-line num-persons has-shelter]
+  Object
+  (toString [gs] (str "NodeInfo: " (into {} gs))))
+
+(defmethod print-method NodeInfo [gs ^java.io.Writer w] (.write w (str gs)))
 
 (defrecord EdgeInfo [name start end weight])
 
@@ -56,37 +60,36 @@
 (defn node-dead-line [graph-desc node]
   (-> graph-desc :props :nodes (get node) :dead-line))
 
-(defn node-info-for-mid-edge-nodes [graph-desc]
-  (let [mid-nodes (gutils/mid-nodes graph-desc)]
-    (map #(map->NodeInfo {
-                          :name %
-                          :dead-line INF
-                          :num-persons 0
-                          :has-shelter false
-                          }
-                    ) mid-nodes)))
+(defn node-info-for-node-name [node-name]
+  (map->NodeInfo {:name node-name :dead-line INF :num-persons 0 :has-shelter false}))
 
-(defn node-info-for-mid-edge-edges [graph-desc]
-  (let [mid-edges (gutils/mid-edges graph-desc)]
-    (map #(map->EdgeInfo {
-                          :name (str %)
-                          :start (first %)
-                          :end (second %)
-                          :weight 1
-                          }) mid-edges)))
+(defn node-info-for-mid-edge-nodes [graph-desc]
+  (let [mid-nodes (gutils/mid-nodes graph-desc)
+        node-infos (map node-info-for-node-name mid-nodes)]
+
+    (zipmap (sort mid-nodes) (sort-by :name node-infos))))
+
+(defn edge-info-for-edge [edge]
+  (map->NodeInfo {:name (str edge) :start (first edge) :end (second edge) :weight 1}))
+
+(defn edge-info-for-mid-edge-edges [graph-desc]
+  (let [mid-edges (gutils/mid-edges graph-desc)
+        edge-infos (map edge-info-for-edge mid-edges)]
+
+    (zipmap (sort (map :name edge-infos)) (sort-by :name edge-infos))))
 
 (defn props-for-dense
-  [{{shelters :shelters node-infos :nodes edge-infos :edges} :props
-    :as graph-desc}]
+  [{{shelters :shelters node-infos :nodes edge-infos :edges} :props}
+   new-graph-struct]
 
-  (let [new-num-nodes (count (graph/nodes (:structure graph-desc)))
-        new-node-infos (merge node-infos (node-info-for-mid-edge-nodes graph-desc))
-        new-edge-infos (merge edge-infos (node-info-for-mid-edge-edges graph-desc))]
+  (let [new-num-nodes (count (graph/nodes new-graph-struct))
+        new-node-infos (merge node-infos (log/spy (node-info-for-mid-edge-nodes new-graph-struct)))
+        new-edge-infos (merge edge-infos (edge-info-for-mid-edge-edges new-graph-struct))]
     (GraphProps. new-num-nodes shelters new-node-infos new-edge-infos)))
 
 (defn make-dense
   [{remaining-people :remaining-people :as graph-desc}]
 
   (let [new-graph-struct (gutils/dense-graph (:structure graph-desc))
-        new-graph-props (props-for-dense new-graph-struct)]
+        new-graph-props (props-for-dense graph-desc new-graph-struct)]
     (DenseGraphDescription. new-graph-struct new-graph-props remaining-people true)))

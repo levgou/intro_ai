@@ -40,7 +40,7 @@
      (gs/rem-people graph-desc (gs/state-of di-state agent))
      (-> di-state
          (gs/assoc-in-agent agent :carrying (+ carrying ppl-at-agent-node))
-         (gs/assoc-in-agent agent :id (nano-id 10)))
+         (gs/assoc-in-agent agent :id (nano-id 7)))
      ]))
 
 (defn update-saved [di-state agent]
@@ -77,7 +77,7 @@
                                      (gs/assoc-in-agent agent :terminated (term-type-of graph-desc agent-state))
                                      (gs/assoc-in-agent agent :dead (update-dead-count agent-state graph-desc))
                                      (gs/assoc-in-agent agent :carrying 0)
-                                     (gs/assoc-in-agent agent :id (nano-id 10))
+                                     (gs/assoc-in-agent agent :id (nano-id 7))
                                      (calc-final-score agent))]
         [graph-desc final-agent-di-state]))))
 
@@ -90,7 +90,8 @@
   (invoke [this graph-desc di-state agent]
     (let [new-di-state (-> di-state
                            (gs/traverse-edge agent dest)
-                           (gs/progress-time traversal-time))]
+                           ;(gs/progress-time traversal-time)
+                           )]
 
       (if-not (gd/time-over? graph-desc di-state agent)
         (do (log/debug (<< "[~{(:name agent)}] Got to node [~{dest}] at time [~{(:time new-di-state)}]"))

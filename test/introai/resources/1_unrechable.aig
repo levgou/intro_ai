@@ -2,7 +2,7 @@
 
 #V1 D9 S                    ; Vertex 1, deadline 7, contains a hurricane shelter (a "goal vertex" - there may be more than one)
 #V2 D5 P1                   ; Vertex 2, deadline 5, initially contains 1 person to be rescued
-#V3 D10 S                    ; Vertex 3, Deadline 1, shelter
+#V3 D12 S                    ; Vertex 3, Deadline 1, shelter
 #V4 D14 P2                   ; Vertex 4, deadline 4, initially contains 2 persons to be rescued
 #V5 D14 P3
 

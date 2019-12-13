@@ -49,8 +49,8 @@
 
 (defn initial-di-state []
   (let [new-state
-        (GameState. "1", 0, 0, {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0}, E/NOT-TERMINATED, 0, (nano-id 10))]
-    (TwoAgentState. new-state new-state 0 (nano-id 10))))
+        (GameState. "1", 0, 0, {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0}, E/NOT-TERMINATED, 0, (nano-id 7))]
+    (TwoAgentState. new-state new-state 0 (nano-id 7))))
 
 (defn progress-time [di-state time-amount]
   (update di-state :time + time-amount))
@@ -63,3 +63,16 @@
 
 (defn term? [state]
   (in? [E/TERMINATED-UNSAFELY E/TERMINATED-SAFELY] (:terminated state)))
+
+(defn term-safe? [state]
+  (in? [E/TERMINATED-SAFELY] (:terminated state)))
+
+(defn other-agent [minimax-state agent]
+  (first (remove #{agent} (:agent-order minimax-state))))
+
+(defn other-agent-state [minimax-state agent]
+  (state-of (:di-state minimax-state)
+            (first (remove #{agent} (:agent-order minimax-state)))))
+
+(defn died-with-agent-count [state]
+  (-> state :dead E/DIED-WITH-AGENT))

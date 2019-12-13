@@ -36,21 +36,63 @@
    dest]
 
   (let [distance-to-dest (gutils/shortest-path-len graph-struct src dest)
+        can-reach-dest (can-reach-dest-on-time? graph-desc dest cur-time distance-to-dest)
+        can-reach-shelter (can-reach-shelter-on-time? graph-desc dest cur-time distance-to-dest)
 
         savable-people
-        (if (and (can-reach-dest-on-time? graph-desc dest cur-time distance-to-dest)
-                 (can-reach-shelter-on-time? graph-desc dest cur-time distance-to-dest))
-          (remaining-people dest)
+        (if (and can-reach-dest can-reach-shelter)
+
+          (if (= dest "5")
+            (first [
+                    (can-reach-dest-on-time? graph-desc dest cur-time distance-to-dest)
+                    (remaining-people dest)])
+
+            (remaining-people dest)
+            )
           0)]
 
     savable-people))
 
+(defn count-savable-people-other-nodes [graph-desc state cur-time]
+  (apply + (map
+             #(people-can-save-at graph-desc state cur-time %)
+             (gd/remaining-nodes graph-desc))))
+
+(defn carry-people-savable [graph-desc state cur-time]
+  (if (can-reach-shelter-on-time? graph-desc (:agent-node state) cur-time 0)
+    (:carrying state)
+    0))
+
+(defn count-savable-people [graph-desc state cur-time]
+  (if (gs/term? state)
+    0
+    (let [at-others (count-savable-people-other-nodes graph-desc state cur-time)
+          own (carry-people-savable graph-desc state cur-time)]
+      (+ 2 3)
+      (+ at-others own))))
+
+(defn calc-term-penalty [state]
+  (if (or (not (gs/term? state)) (gs/term-safe? state))
+    0
+    (- -2 (gs/died-with-agent-count state))))
+
+(defn calc-giveup-penalty [state savable-people]
+  (if (and (pos? savable-people) (gs/term? state))
+    -1
+    0))
+
 (defn heuristic [graph-desc state cur-time]
-  (let [savable-people
-        (apply + (map
-                   #(people-can-save-at graph-desc state cur-time %)
-                   (gd/remaining-nodes graph-desc)))]
-    savable-people))
+  (let [savable-people (count-savable-people graph-desc state cur-time)
+        term-penalty (calc-term-penalty state)
+        giveup-penalty (calc-giveup-penalty state savable-people)]
+
+    (let [h-val
+          (+
+            (if-not (gs/term? state) savable-people 0)
+            term-penalty
+            giveup-penalty)]
+      (+ 2 3)
+      h-val)))
 
 (defn agent-heuristic [graph-desc di-state agent]
   (heuristic graph-desc (gs/state-of di-state agent) (:time di-state)))
@@ -91,7 +133,7 @@
 (defn agent-active? [cur-di-state agent] (not (agent-term? cur-di-state agent)))
 (defn mid-edge? [graph-desc di-state agent] (->> (gs/state-of di-state agent)
                                                  :agent-node
-                                                 (gutils/node-mid-edge? graph-desc)))
+                                                 (gutils/node-mid-edge? (:structure graph-desc))))
 
 (defn all-agents-term? [di-state agents]
   (every? #(agent-term? di-state %) agents))

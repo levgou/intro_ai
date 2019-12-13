@@ -5,7 +5,9 @@
             [loom.attr :as g-attr]
             [clojure.core.strint :refer [<<]]
             [introai.utils.collections :refer [pairwise-collection]]
-            [introai.utils.log :as log]))
+            [introai.utils.log :as log]
+            [introai.assignment2.game-state :as gs]
+            ))
 
 
 (defn edge-from-src-target-node [game-graph src-node target-node]
@@ -49,9 +51,12 @@
   [g src dest]
   (second (shortest-path-dist g src dest)))
 
-(defn node-mid-edge? [gdesc node]
-  (true?
-    (g-attr/attr (:structure gdesc) node :mid-edge)))
+(defn node-mid-edge?
+  ([graph-struct node]
+   (true? (g-attr/attr graph-struct node :mid-edge)))
+
+  ([graph-desc di-state agent]
+   (node-mid-edge? (:structure graph-desc) (gs/state-piece-of di-state agent :agent-node))))
 
 (defn edge-map [g [src dest]]
   {
@@ -75,8 +80,7 @@
 
 (defn edges-to-add-for-edge [edge]
   (let [p (new-path edge)]
-    (println edge)
-    (log/spy (pairwise-collection p))))
+    (pairwise-collection p)))
 
 (defn new-nodes-only [g new-edges]
   (let [old-nodes (graph/nodes g)]
@@ -89,8 +93,6 @@
 (defn dense-graph [g]
   (let [new-edges (break-down-edges g)]
     (let [new-nodes (new-nodes-only g new-edges)]
-      (println new-edges)
-      (println new-nodes)
       (-> (apply graph/digraph new-edges)
           (g-attr/add-attr-to-nodes :mid-edge true new-nodes)))))
 
@@ -100,12 +102,12 @@
 (defn weight [graph-desc src-int dest-int]
   (if (dense? graph-desc) 1 (graph/weight (:structure graph-desc) src-int dest-int)))
 
-(defn mid-nodes [{struct :structure :as graph-desc}]
-  (filter (partial node-mid-edge? graph-desc) (graph/nodes struct)))
+(defn mid-nodes [graph-struct]
+  (filter (partial node-mid-edge? graph-struct) (graph/nodes graph-struct)))
 
-(defn mid-node-in-edge [graph-desc edge-vec]
+(defn mid-node-in-edge [graph-struct edge-vec]
   (any?
-    (map (partial node-mid-edge? graph-desc) edge-vec)))
+    (map (partial node-mid-edge? graph-struct) edge-vec)))
 
-(defn mid-edges [{struct :structure :as graph-desc}]
-  (filter (partial mid-node-in-edge graph-desc) (graph/edges struct)))
+(defn mid-edges [graph-struct]
+  (filter (partial mid-node-in-edge graph-struct) (graph/edges graph-struct)))

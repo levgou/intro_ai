@@ -6,6 +6,8 @@
     [introai.utils.log :as log]
     [introai.utils.const :refer [INF -INF]]
     [introai.utils.const :as E]
+    [nano-id.core :refer [nano-id]]
+    [introai.utils.graphs :as gutils]
     ))
 
 
@@ -23,16 +25,28 @@
 (defn minimizers-turn [minimax-state] (:agent-order minimax-state))
 (defn maximizers-turn [minimax-state] (repeat 2 (first (:agent-order minimax-state))))
 
+(defn inc-depth [{agent-order :agent-order graph-desc :graph-desc di-state :di-state} depth]
+  (let [op-agent (first agent-order)
+        mid-edge (gutils/node-mid-edge? graph-desc di-state op-agent)
+        terminated (agent-term? di-state op-agent)]
+    ;(log/info (:name op-agent))
+    (+ depth (if (or mid-edge terminated) 0 1))))
+
+(defn progress-tick [minimax-props op-agent ops-and-results]
+  (if (not= op-agent (:time-progressor minimax-props))
+    ops-and-results
+    (map #(update-in % [:di-state :time] inc) ops-and-results)))
+
 (defn update-graph-state [minimax-state graph-desc di-state]
   (assoc minimax-state :graph-desc graph-desc :di-state di-state))
 
-(defrecord MiniMaxNodeProps [alpha beta depth]
+(defrecord MiniMaxNodeProps [alpha beta depth time-progressor]
   Object
   (toString [x] (str (into {} x))))
 (defmethod print-method MiniMaxNodeProps [x ^java.io.Writer w] (.write w (str x)))
 
 (defn both-agents-terminated [di-state agent-order]
-  (log/debug "Bot agents terminated!")
+  (log/debug "Both agents terminated!")
   (and
     (agent-term? di-state (first agent-order))
     (agent-term? di-state (second agent-order))
@@ -64,16 +78,30 @@
         )
   )
 
+
+(defn adversarial-heuristic
+  [{graph-desc :graph-desc di-state :di-state :as minimax-state} agent]
+  (let [other (gs/other-agent minimax-state agent)]
+    (-
+      (agent-heuristic graph-desc di-state agent)
+      (agent-heuristic graph-desc di-state other))))
+
 (defn stat-eval
   "todo: could heuristic be better than actual score?"
-  [{di-state :di-state agent-order :agent-order heuristic :heuristic graph-desc :graph-desc}
+  [{di-state :di-state agent-order :agent-order heuristic :heuristic :as minimax-state}
+   minimax-props
    agent]
 
   (let [agent-state (gs/state-of di-state agent)]
 
     (if (both-agents-terminated di-state agent-order)
-      (calc-agent-score agent-state)
-      (heuristic graph-desc di-state agent))))
+      ;(log/spy
+        {:score (calc-agent-score agent-state) :org "G" :depth (:depth minimax-props) :id (nano-id 5)}
+        ;)
+      ;(log/spy
+        {:score (heuristic minimax-state agent) :org "H" :depth (:depth minimax-props) :id (nano-id 5)}
+        ;)
+      )))
 
 (defn assoc-op-with-res [graph-desc di-state agent map-with-op]
   (let [[new-graph-desc new-di-state] ((:op map-with-op) graph-desc di-state agent)]
@@ -90,57 +118,70 @@
   [{op :op graph-desc :graph-desc di-state :di-state :as m} minimax-state minimax-props]
 
   (let [new-minimax-state (update-graph-state minimax-state graph-desc di-state)
-        min-val (min-value new-minimax-state minimax-props)]
-    (assoc m :min-val min-val)))
+        res-and-min-val (min-value new-minimax-state minimax-props)]
+    (-> m
+        (assoc :min-val (:min-val res-and-min-val))
+        (assoc :tail res-and-min-val))
+    ;res-and-min-val
+    ))
 
 (defn assoc-res-with-max-val
   [{op :op graph-desc :graph-desc di-state :di-state :as m} minimax-state minimax-props]
 
   (let [new-minimax-state (update-graph-state minimax-state graph-desc di-state)
-        max-val (max-value new-minimax-state minimax-props)]
-    (assoc m :max-val max-val)))
+        res-and-max-val (max-value new-minimax-state minimax-props)]
+    (-> m
+        (assoc :max-val (:max-val res-and-max-val))
+        (assoc :tail res-and-max-val))
+    ;res-and-max-val
+    ))
 
 (defn prune-next-states-max
-  [minimax-state ops-and-results {alpha :alpha beta :beta depth :depth}]
+  [minimax-state ops-and-results {alpha :alpha beta :beta depth :depth time-progressor :time-progressor}]
 
   (loop [[res & others] ops-and-results
          max-val -INF
          cur-alpha alpha]
 
-    (let [v (max max-val (:min-val
-                           (assoc-res-with-min-val
-                             res minimax-state (MiniMaxNodeProps. cur-alpha beta (inc depth)))))]
+    (let [res-and-min-val (assoc-res-with-min-val
+                            res minimax-state (MiniMaxNodeProps. cur-alpha beta (inc-depth minimax-state depth) time-progressor))
+          v (max max-val (-> res-and-min-val :min-val :score))]
 
       (if (or (>= v beta) (nil? others))
-        v
+        ;v
+        res-and-min-val
         (recur others v (max cur-alpha v))))))
 
 (defn max-value
   [minimax-state minimax-props]
 
   (let [[agent op-agent] (maximizers-turn minimax-state)]
+    ;(log/info "MAX: " (gs/state-of (:di-state minimax-state) op-agent))
 
     (if (term-search? minimax-state minimax-props)
-      (let [score (stat-eval minimax-state agent)]
-        score)
+      (let [score (stat-eval minimax-state minimax-props agent)]
+        {:max-val score :tail nil})
 
-      (let [ops (next-ops minimax-state op-agent)]
-        (let [ops-and-results (assoc-ops-with-res minimax-state op-agent ops)]
-          (prune-next-states-max minimax-state ops-and-results minimax-props))))))
+      (let [ops (next-ops minimax-state op-agent)
+            ops-and-results (assoc-ops-with-res minimax-state op-agent ops)
+            ops-and-res-tick (progress-tick minimax-props op-agent ops-and-results)
+            next-op-and-score (prune-next-states-max minimax-state ops-and-res-tick minimax-props)]
+        {:max-val (:min-val next-op-and-score) :tail next-op-and-score}
+        ))))
 
 (defn prune-next-states-min
-  [minimax-state ops-and-results {alpha :alpha beta :beta depth :depth}]
+  [minimax-state ops-and-results {alpha :alpha beta :beta depth :depth time-progressor :time-progressor}]
 
   (loop [[res & others] ops-and-results
          min-val INF
          cur-beta beta]
 
-    (let [v (min min-val (:max-val
-                           (assoc-res-with-max-val
-                             res minimax-state (MiniMaxNodeProps. alpha cur-beta (inc depth)))))]
+    (let [res-and-max-val (assoc-res-with-max-val
+                            res minimax-state (MiniMaxNodeProps. alpha cur-beta (inc-depth minimax-state depth) time-progressor))
+          v (min min-val (-> res-and-max-val :max-val :score))]
 
       (if (or (<= v alpha) (nil? others))
-        v
+        res-and-max-val
         (recur others v (min cur-beta v))))))
 
 (defn min-value
@@ -151,24 +192,56 @@
   (let [[agent op-agent] (minimizers-turn minimax-state)]
 
     (if (term-search? minimax-state minimax-props)
-      (let [score (stat-eval minimax-state agent)]
-        score)
+      (let [score (stat-eval minimax-state minimax-props agent)]
+        {:min-val score :tail nil})
 
-      (let [ops (next-ops minimax-state op-agent)]
-        (let [ops-and-results (assoc-ops-with-res minimax-state op-agent ops)]
-          (prune-next-states-min minimax-state ops-and-results minimax-props))))))
+      (let [ops (next-ops minimax-state op-agent)
+            ops-and-results (assoc-ops-with-res minimax-state op-agent ops)
+            ops-and-res-tick (progress-tick minimax-props op-agent ops-and-results)
+            next-op-and-score (prune-next-states-min minimax-state ops-and-res-tick minimax-props)]
+        {:min-val (:max-val next-op-and-score) :tail next-op-and-score}
+        ))))
 
+(defn tail-summary
+  ([m]
+   (tail-summary m []))
+
+  ([m state-vec]
+   (loop [cur-m m cur-state-vec state-vec iter 1]
+      ;(println [
+      ;          (-> cur-m :di-state :state1 :agent-node)
+      ;          (-> cur-m :di-state :state2 :agent-node)
+      ;          ]
+      ;         )
+      (if (nil? cur-m)
+        cur-state-vec
+
+        (recur
+          (-> cur-m :tail :tail)
+          (conj cur-state-vec
+                [iter
+                 [
+                  (-> cur-m :di-state :state1 :agent-node)
+                  (-> cur-m :di-state :state1 :terminated)
+                  (-> cur-m :di-state :state2 :agent-node)
+                  (-> cur-m :di-state :state2 :terminated)
+                  ]])
+          (inc iter)
+          )))))
 
 (defn mini-max [graph-desc di-state agent-order]
-  (let [initial-minimax-state (MiniMaxState. graph-desc di-state agent-heuristic agent-order)
-        initial-minimax-props (MiniMaxNodeProps. -INF INF 0)
+  (log/info di-state)
+
+  (let [time-progressor (first (filter #(= (:name %) "Bob") agent-order))
+        initial-minimax-state (MiniMaxState. graph-desc di-state adversarial-heuristic agent-order)
+        initial-minimax-props (MiniMaxNodeProps. -INF INF 0 time-progressor)
         op-agent (first agent-order)]
 
-    (let [ops (next-ops initial-minimax-state op-agent)]
-      (let [ops-and-results (assoc-ops-with-res initial-minimax-state op-agent ops)]
-        (let [maps-with-min-vals (into [] (map #(assoc-res-with-min-val % initial-minimax-state initial-minimax-props) ops-and-results))]
+    (let [ops (next-ops initial-minimax-state op-agent)
+          ops-and-results (assoc-ops-with-res initial-minimax-state op-agent ops)
+          maps-with-min-vals (into [] (map #(assoc-res-with-min-val % initial-minimax-state initial-minimax-props) ops-and-results))]
 
-          (doseq [m maps-with-min-vals]
-            (log/debug "&>>" (:min-val m) (into {} (:op m))))
+      (doseq [m maps-with-min-vals]
+        (log/debug (str (first agent-order)) " &>>" (:min-val m) (into {} (:op m)) (tail-summary m)))
 
-          (:op (apply max-key :min-val maps-with-min-vals)))))))
+      (:op (apply max-key #(-> % :min-val :score) maps-with-min-vals)) )))
