@@ -53,8 +53,10 @@
     di-state
     (-> di-state (update-saved agent) (gs/assoc-in-agent agent :carrying 0))))
 
-(defn term-type-of [graph-desc state]
-  (if (gd/shelter? graph-desc state) E/TERMINATED-SAFELY E/TERMINATED-UNSAFELY))
+(defn term-type-of [graph-desc di-state agent]
+  (if (and (gd/shelter? graph-desc (gs/state-of di-state agent)) (not (gd/time-over? graph-desc di-state agent)))
+    E/TERMINATED-SAFELY
+    E/TERMINATED-UNSAFELY))
 
 (defn calc-final-score [di-state agent]
   (gs/assoc-in-agent di-state agent :score (calc-final-g (gs/state-of di-state agent))))
@@ -74,17 +76,21 @@
   (invoke [this graph-desc di-state agent]
     (let [agent-state (gs/state-of di-state agent)]
       (let [final-agent-di-state (-> di-state
-                                     (gs/assoc-in-agent agent :terminated (term-type-of graph-desc agent-state))
+                                     (gs/assoc-in-agent agent :terminated (term-type-of graph-desc di-state agent))
                                      (gs/assoc-in-agent agent :dead (update-dead-count agent-state graph-desc))
                                      (gs/assoc-in-agent agent :carrying 0)
                                      (gs/assoc-in-agent agent :id (nano-id 7))
                                      (calc-final-score agent))]
-        [graph-desc final-agent-di-state]))))
+        [graph-desc final-agent-di-state])))
+
+  Object
+  (toString [x] (str (select-keys x [:src]))))
+(defmethod print-method Term [x ^java.io.Writer w] (.write w (str "Term:" x)))
 
 (defn make-term [vertex]
   (Term. vertex vertex E/T_TERM))
 
-(defrecord Edge [traversal-time src dest op-type]
+(defrecord Edge [src dest op-type]
   clojure.lang.IFn
 
   (invoke [this graph-desc di-state agent]
@@ -100,11 +106,15 @@
               (put-people-shelter graph-desc new-di-state agent)
               agent))
 
-        ((make-term dest) graph-desc new-di-state agent)))))
+        ((make-term dest) graph-desc new-di-state agent))))
+
+  Object
+  (toString [x] (str (select-keys x [:src :dest]))))
+(defmethod print-method Edge [x ^java.io.Writer w] (.write w (str "Edge:" x)))
+
 
 (defn make-edge [graph-desc {src :agent-node} dest]
-  (Edge. (gutils/weight graph-desc src dest)
-         src
+  (Edge. src
          dest
          E/T_EDGE))
 

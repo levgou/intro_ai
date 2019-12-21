@@ -2,6 +2,7 @@
   (:gen-class)
   (:require
     [introai.assignment2.agents.game-funcs :refer [gen-next-ops agent-term? agent-heuristic]]
+    [introai.assignment2.agents.utils :refer [tail-summary-str calc-agent-score]]
     [introai.assignment2.game-state :as gs]
     [introai.utils.log :as log]
     [introai.utils.const :refer [INF -INF]]
@@ -62,29 +63,20 @@
     (both-agents-terminated di-state agent-order)
     (cutoff-minimax minimax-props)))
 
-(defn calc-agent-score [state]
-  (-
-    (:saved state)
-
-    (if (= (:terminated state) E/TERMINATED-UNSAFELY) 2 0)
-    (-> state :dead E/DIED-IN-CITY)
-    (* 2 (-> state :dead E/DIED-WITH-AGENT))
-    ))
-
 (defn next-ops [{graph-desc :graph-desc di-state :di-state} op-agent]
   (into []
-        (map #(identity {:op %})
+        (map #(hash-map :op %)
              (gen-next-ops graph-desc di-state op-agent))
         )
   )
 
-
 (defn adversarial-heuristic
   [{graph-desc :graph-desc di-state :di-state :as minimax-state} agent]
-  (let [other (gs/other-agent minimax-state agent)]
-    (-
-      (agent-heuristic graph-desc di-state agent)
-      (agent-heuristic graph-desc di-state other))))
+  (let [other (gs/other-agent minimax-state agent)
+        own-h (agent-heuristic graph-desc di-state agent)
+        other-h (agent-heuristic graph-desc di-state other)]
+    {:val (- (:val own-h) (:val other-h)) :own own-h :other other-h}
+    ))
 
 (defn stat-eval
   "todo: could heuristic be better than actual score?"
@@ -92,16 +84,14 @@
    minimax-props
    agent]
 
-  (let [agent-state (gs/state-of di-state agent)]
+  (let [agent-state (gs/state-of di-state agent)
+        g-score (calc-agent-score agent-state)
+        h-score (heuristic minimax-state agent)
+        cutoff (not (both-agents-terminated di-state agent-order))]
 
-    (if (both-agents-terminated di-state agent-order)
-      ;(log/spy
-        {:score (calc-agent-score agent-state) :org "G" :depth (:depth minimax-props) :id (nano-id 5)}
-        ;)
-      ;(log/spy
-        {:score (heuristic minimax-state agent) :org "H" :depth (:depth minimax-props) :id (nano-id 5)}
-        ;)
-      )))
+    {:score (+ g-score (:val h-score)) :g g-score :h h-score :cutoff cutoff :depth (:depth minimax-props) :id (nano-id 5)}
+
+    ))
 
 (defn assoc-op-with-res [graph-desc di-state agent map-with-op]
   (let [[new-graph-desc new-di-state] ((:op map-with-op) graph-desc di-state agent)]
@@ -202,35 +192,9 @@
         {:min-val (:max-val next-op-and-score) :tail next-op-and-score}
         ))))
 
-(defn tail-summary
-  ([m]
-   (tail-summary m []))
-
-  ([m state-vec]
-   (loop [cur-m m cur-state-vec state-vec iter 1]
-      ;(println [
-      ;          (-> cur-m :di-state :state1 :agent-node)
-      ;          (-> cur-m :di-state :state2 :agent-node)
-      ;          ]
-      ;         )
-      (if (nil? cur-m)
-        cur-state-vec
-
-        (recur
-          (-> cur-m :tail :tail)
-          (conj cur-state-vec
-                [iter
-                 [
-                  (-> cur-m :di-state :state1 :agent-node)
-                  (-> cur-m :di-state :state1 :terminated)
-                  (-> cur-m :di-state :state2 :agent-node)
-                  (-> cur-m :di-state :state2 :terminated)
-                  ]])
-          (inc iter)
-          )))))
-
 (defn mini-max [graph-desc di-state agent-order]
-  (log/info di-state)
+  (log/info (str (first agent-order)) ">>> " (:remaining-people graph-desc))
+
 
   (let [time-progressor (first (filter #(= (:name %) "Bob") agent-order))
         initial-minimax-state (MiniMaxState. graph-desc di-state adversarial-heuristic agent-order)
@@ -242,6 +206,8 @@
           maps-with-min-vals (into [] (map #(assoc-res-with-min-val % initial-minimax-state initial-minimax-props) ops-and-results))]
 
       (doseq [m maps-with-min-vals]
-        (log/debug (str (first agent-order)) " &>>" (:min-val m) (into {} (:op m)) (tail-summary m)))
+        (log/info (str (first agent-order)) " &>>" (:min-val m) (into {} (:op m))
+          (tail-summary-str m)
+          ))
 
-      (:op (apply max-key #(-> % :min-val :score) maps-with-min-vals)) )))
+      (:op (apply max-key #(-> % :min-val :score) maps-with-min-vals)))))

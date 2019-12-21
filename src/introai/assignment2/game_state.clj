@@ -30,7 +30,8 @@
    id
    ]
   Object
-  (toString [tas] (str (into {} tas)))
+  ;(toString [tas] (str (into {} tas)))
+  (toString [tas] "TwoAgentState")
   )
 
 (defmethod print-method TwoAgentState [tas ^java.io.Writer w] (.write w (str tas)))

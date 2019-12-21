@@ -17,9 +17,15 @@
 
 (defrecord GraphProps [num-nodes shelters nodes edges])
 
-(defrecord GraphDescription [structure props remaining-people])
+(defrecord GraphDescription [structure props remaining-people]
+  Object
+  (toString [x] "GraphDesc"))
+(defmethod print-method GraphDescription [x ^java.io.Writer w] (.write w (str x)))
 
-(defrecord DenseGraphDescription [structure props remaining-people dense])
+(defrecord DenseGraphDescription [structure props remaining-people dense]
+  Object
+  (toString [x] "DenseGraphDesc"))
+(defmethod print-method DenseGraphDescription [x ^java.io.Writer w] (.write w (str x)))
 
 (defn state-node-info [graph-desc state]
   (-> graph-desc :props :nodes (#(% (:agent-node state)))))
