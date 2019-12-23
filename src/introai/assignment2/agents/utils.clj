@@ -67,3 +67,8 @@
   (if (not= op-agent (:time-progressor maxmax-props))
     m-ogds
     (map #(update-in % [:di-state :time] inc) m-ogds)))
+
+(defn progress-tick-state [minmax-state maxmax-props op-agent]
+  (if (not= op-agent (:time-progressor maxmax-props))
+    minmax-state
+    (update-in minmax-state [:di-state :time] inc)))

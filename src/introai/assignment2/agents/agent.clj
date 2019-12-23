@@ -3,7 +3,7 @@
   (:require
     [introai.assignment2.agents.human :refer [interactive]]
     [introai.assignment2.agents.greedy :refer [greedy]]
-    [introai.assignment2.agents.mini-max :refer [mini-max]]
+    [introai.assignment2.agents.min-max :refer [min-max]]
     [introai.assignment2.agents.max-max :refer [max-max]]
     [introai.assignment2.agents.game-funcs :refer [MAX_EXPAND-LIMIT]]
     [introai.assignment2.game-state :as gs]))
@@ -19,7 +19,7 @@
                  ]
 
     "minmax"    [
-                 mini-max
+                 min-max
                  ]
     "semi-coop" [
                  max-max

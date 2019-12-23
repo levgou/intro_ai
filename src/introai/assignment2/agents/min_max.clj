@@ -3,27 +3,38 @@
   (:require
     [introai.assignment2.agents.game-funcs :refer [gen-next-ops agent-term? agent-heuristic]]
     [introai.assignment2.game-state :as gs]
-    [introai.assignment2.agents.utils :refer [tail-summary-str calc-agent-score]]
+    [introai.assignment2.agents.utils :refer
+     [tail-summary-str calc-agent-score both-agents-terminated progress-tick progress-tick-state]]
     [introai.utils.log :as log]
     [introai.utils.const :refer [INF -INF]]
     [introai.utils.const :as E]
     [nano-id.core :refer [nano-id]]
     [introai.utils.graphs :as gutils]
-    ))
+    [introai.assignment2.graph-description :as gd]))
 
 
 (declare max-value)
 (declare min-value)
 (declare assoc-res-with-max-val)
+(declare assoc-res-with-min-val)
 (declare assoc-op-with-res)
+
+(def MAX-DEPTH 9)
+
+(defn player-max-sort-key
+  "sort key - that will maximize the score of the first agent - second agent"
+  [m-ogdmt]
+  (-> m-ogdmt :evl :scores ((fn [[p1 p2]] (- p1 p2)))))
+
+(defn player-min-sort-key
+  "sort key - that will minimize the score of the first agent - second agent"
+  [m-ogdmt]
+  (- (player-max-sort-key m-ogdmt)))
 
 (defrecord MinMaxState [graph-desc di-state heuristic agent-order]
   Object
-  (toString [x] (str (into {} x))))
-(defmethod print-method MinMaxState [x ^java.io.Writer w] (.write w (str x)))
-
-(defn rev-order [minmax-state]
-  (update minmax-state :agent-order reverse))
+  (toString [x] (str (select-keys x [:agent-order]))))
+(defmethod print-method MinMaxState [x ^java.io.Writer w] (.write w (str "MMS:" x)))
 
 (defn inc-depth [{agent-order :agent-order graph-desc :graph-desc di-state :di-state} depth]
   (let [op-agent (first agent-order)
@@ -31,56 +42,66 @@
         terminated (agent-term? di-state op-agent)]
     (+ depth (if (or mid-edge terminated) 0 1))))
 
-(defn progress-tick [minmax-props op-agent ops-and-results]
-  (if (not= op-agent (:time-progressor minmax-props))
-    ops-and-results
-    (map #(update-in % [:di-state :time] inc) ops-and-results)))
-
 (defn update-graph-state [minmax-state graph-desc di-state]
-  "updates graph state with new graph desc and di-state"
   (assoc minmax-state :graph-desc graph-desc :di-state di-state))
 
-(defrecord MinMaxNodeProps [depth maxifier time-progressor agent other-agent]
+(defrecord MinMaxNodeProps [depth time-progressor agent other-agent]
   Object
-  (toString [x] (str (into {} x))))
-(defmethod print-method MinMaxNodeProps [x ^java.io.Writer w] (.write w (str x)))
+  (toString [x] (str (select-keys x [:depth :agent]))))
+(defmethod print-method MinMaxNodeProps [x ^java.io.Writer w] (.write w (str "Props:" x)))
 
-(defn both-agents-terminated [di-state agent-order]
-  (log/debug "Both agents terminated!")
-  (and
-    (agent-term? di-state (first agent-order))
-    (agent-term? di-state (second agent-order))
+(defrecord Evaluation [scores h-vals g-vals cutoff depth agent other-agent agent-state id]
+  Object
+  (toString [x]
+    (str (select-keys x [:scores :agent-state]))
+    ;(str (into {} x))
     ))
+(defmethod print-method Evaluation [x ^java.io.Writer w] (.write w (str "Eval" x)))
 
-(def MAX-DEPTH 9)
-(defn cutoff-minmax [minmax-props]
+(defn make-eval [score-vec h-vec g-vec cutoff minmax-props agent other-agent agent-state]
+  (Evaluation. score-vec h-vec g-vec cutoff (:depth minmax-props) (str agent) (str other-agent) agent-state (nano-id 5)))
+
+(defn cutoff-maxmax [minmax-props]
   (log/debug "Depth cutoff!")
   (< MAX-DEPTH (:depth minmax-props)))
 
 (defn term-search? [{di-state :di-state agent-order :agent-order} minmax-props]
   (or
     (both-agents-terminated di-state agent-order)
-    (cutoff-minmax minmax-props)))
+    (cutoff-maxmax minmax-props)))
+
+(defrecord M-O [op]
+  Object
+  (toString [x] (str (into {} x))))
+(defmethod print-method M-O [x ^java.io.Writer w] (.write w (str "M-O:" x)))
 
 (defn next-ops [{graph-desc :graph-desc di-state :di-state} op-agent]
-  (into []
-        (map #(identity {:op %})
-             (gen-next-ops graph-desc di-state op-agent))))
+  "[M-O1 M-O2 ...]"
+  (let [n-ops (into [] (map #(M-O. %)
+                            (gen-next-ops graph-desc di-state op-agent)))]
+    n-ops))
+
+(defrecord M-OGD [op graph-desc di-state]
+  Object
+  (toString [x] (str (into {} x))))
+(defmethod print-method M-OGD [x ^java.io.Writer w] (.write w (str "M-OGD:" x)))
+(defn make-m-ogd [m-o graph-desc di-state] (M-OGD. (:op m-o) graph-desc di-state))
+
+(defrecord M-OGDMT [op graph-desc di-state evl tail]
+  Object
+  (toString [x] (str (into {} x))))
+(defmethod print-method M-OGDMT [x ^java.io.Writer w] (.write w (str "M-OGDMT:" x)))
+(defn make-m-ogdmt [m-ogd evl tail] (map->M-OGDMT (assoc m-ogd :evl evl :tail tail)))
 
 (defn own-heuristic
   [{graph-desc :graph-desc di-state :di-state :as minmax-state} agent]
-  (let [other (gs/other-agent minmax-state agent)]
-
-    (agent-heuristic graph-desc di-state agent)
-
-    ))
+  (agent-heuristic graph-desc di-state agent))
 
 (defn stat-eval
-  "todo: could heuristic be better than actual score?"
+  "return Evaluation of current state according to agent"
   [{di-state :di-state agent-order :agent-order heuristic :heuristic :as minmax-state}
    minmax-props
    agent]
-
 
   (let [agent-state (gs/state-of di-state agent)
         other-state (gs/other-agent-state minmax-state agent)
@@ -90,133 +111,165 @@
         g-score-other (calc-agent-score other-state)
         h-score-self (heuristic minmax-state agent)
         h-score-other (heuristic minmax-state other-agent)
-        f-score-self (+ (* 2 g-score-self) (:val h-score-self))
-        f-score-other (+ (* 2 g-score-other) (:val h-score-other))
+        f-score-self (+ (* 1 g-score-self) (:val h-score-self))
+        f-score-other (+ (* 1 g-score-other) (:val h-score-other))
         cutoff (not (both-agents-terminated di-state agent-order))]
 
-    {:score [f-score-self f-score-other] :h-vals [h-score-self h-score-other] :g [g-score-self g-score-other]
-     :cutoff cutoff :depth (:depth minmax-props) :id (nano-id 5) :agent (str agent)}
-    ))
+    (make-eval [f-score-self f-score-other] [h-score-self h-score-other] [g-score-self g-score-other]
+               cutoff, minmax-props, agent other-agent agent-state)))
 
-(defn assoc-op-with-res [graph-desc di-state agent map-with-op]
-  "run op - to generate new graph desc and new di-state"
-  (let [[new-graph-desc new-di-state] ((:op map-with-op) graph-desc di-state agent)]
-    (assoc map-with-op :graph-desc new-graph-desc :di-state new-di-state)))
+(defn assoc-op-with-res
+  "Execute op on current graph and state
+  returns:  M-OGD {:op Edge, :graph-dec GraphDescription :di-state TwoAgentState}"
+  [graph-desc di-state agent m-o]
 
-(defn assoc-ops-with-res
-  "run ops to gen new states"
-  [{graph-desc :graph-desc di-state :di-state} op-agent ops]
-  (into []
-        (map #(assoc-op-with-res graph-desc di-state op-agent %) ops)))
+  (let [[new-graph-desc new-di-state] ((:op m-o) graph-desc di-state agent)]
+    (make-m-ogd m-o new-graph-desc new-di-state)))
+
+(defn compute-ops
+  "Execute ops on current graph and state, returns a vector of results
+  [M-OGD1 M-OGD2 ...]"
+  [{graph-desc :graph-desc di-state :di-state} op-agent m-os]
+  (let [m-ogds
+        (into []
+              (map #(assoc-op-with-res graph-desc di-state op-agent %) m-os))]
+    m-ogds))
 
 (defn assoc-res-with-max-val
-  ""
-  [{op :op graph-desc :graph-desc di-state :di-state :as m} minmax-state minmax-props]
+  "input: op and its result - state & graph desc
+  Recursively call max-value and let the other player play
+  return: M-OGDMT"
+  [{graph-desc :graph-desc di-state :di-state :as m-ogd} minmax-state minmax-props]
 
   (let [new-minmax-state (update-graph-state minmax-state graph-desc di-state)
-        res-and-max-val (max-value new-minmax-state minmax-props)]
-    (-> m
-        (assoc :max-val (:max-val res-and-max-val))
-        (assoc :tail res-and-max-val))
-    ))
+        res-and-max-val (max-value new-minmax-state minmax-props)
+        m-ogdmt (make-m-ogdmt m-ogd (:evl res-and-max-val) res-and-max-val)]
+
+    m-ogdmt))
 
 (defn assoc-res-with-min-val
-  [{op :op graph-desc :graph-desc di-state :di-state :as m} minmax-state minmax-props]
+  "input: op and its result - state & graph desc
+  Recursively call min-value and let the other player play
+  return: M-OGDMT"
+  [{graph-desc :graph-desc di-state :di-state :as m-ogd} minmax-state minmax-props]
 
   (let [new-minmax-state (update-graph-state minmax-state graph-desc di-state)
-        res-and-min-val (min-value new-minmax-state minmax-props)]
-    (-> m
-        (assoc :min-val (:min-val res-and-min-val))
-        (assoc :tail res-and-min-val))
-    ))
+        res-and-min-val (min-value new-minmax-state minmax-props)
+        m-ogdmt (make-m-ogdmt m-ogd (:evl res-and-min-val) res-and-min-val)]
 
-(defn current-maxifier [minmax-state minmax-props]
-  (if (-> minmax-state :agent-order first :name (= (-> minmax-props :agent :name)))
-    (:maxifier1 minmax-props)
-    (:maxifier2 minmax-props)))
+    m-ogdmt))
 
-(defn res-and-max-val [minmax-state minmax-props res]
-  (assoc-res-with-max-val
-    res minmax-state
-    (assoc minmax-props :depth (inc-depth minmax-state (:depth minmax-props)))))
+(defn inc-depth-calc-val
+  "Update depth and associate with min/max-val recursively"
+  [minmax-state minmax-props score-calc m-ogd]
 
-(defn results-and-max-values [minmax-state minmax-props ops-and-results]
-  (into [] (map #(res-and-max-val minmax-state minmax-props %) ops-and-results)))
+  (let [incr-depth (inc-depth minmax-state (:depth minmax-props))
+        m-ogdmt (score-calc
+                  m-ogd minmax-state
+                  (assoc minmax-props :depth incr-depth))]
+    m-ogdmt))
 
-(defn next-state-max
-  [minmax-state ops-and-results minmax-props]
+(defn calc-m-ogdmt-vec-max
+  "Calculate max scores for op results"
+  [minmax-state minmax-props m-ogd-vec]
+  (let [calc-val #(inc-depth-calc-val minmax-state minmax-props assoc-res-with-max-val %)]
+    (into [] (map calc-val m-ogd-vec))))
 
-  (let [maxifier (:maxifier minmax-props)
-        results-and-max-vals (results-and-max-values minmax-state minmax-props ops-and-results)]
-    (last (sort-by maxifier results-and-max-vals))))
+(defn calc-m-ogdmt-vec-min
+  "Calculate max scores for op results"
+  [minmax-state minmax-props m-ogd-vec]
+  (let [calc-val #(inc-depth-calc-val minmax-state minmax-props assoc-res-with-min-val %)]
+    (into [] (map calc-val m-ogd-vec))))
 
-(defn next-state-min
-  [minmax-state ops-and-results minmax-props]
+(defn max-m-ogdmt
+  "Calculate max scores for op results and return the maximal"
+  [minmax-state minmax-props m-ogd-vec]
 
-  (let [maxifier (:maxifier minmax-props)
-        results-and-max-vals (results-and-max-values minmax-state minmax-props ops-and-results)]
-    (last (sort-by maxifier results-and-max-vals))))
+  (let [m-ogdmt-vec (calc-m-ogdmt-vec-min minmax-state minmax-props m-ogd-vec)
+        max-m-ogdmt (last (sort-by player-max-sort-key m-ogdmt-vec))]
+    (log/debug "Out of " (into [] (map :evl m-ogdmt-vec)) "the maximal: " (:evl max-m-ogdmt))
+    max-m-ogdmt))
+
+(defn min-m-ogdmt
+  "Calculate min scores for op results and return the minimal"
+  [minmax-state minmax-props m-ogd-vec]
+
+  (let [m-ogdmt-vec (calc-m-ogdmt-vec-max minmax-state minmax-props m-ogd-vec)
+        min-m-ogdmt (last (sort-by player-min-sort-key m-ogdmt-vec))]
+    (log/debug "Out of " (into [] (map :evl m-ogdmt-vec)) "the minimal: " (:evl min-m-ogdmt))
+    min-m-ogdmt))
 
 (defn max-value
+  "From a state - run all possible ops recursively
+  and return the one with the maximal score
+  {:val Evaluation :tail {<previous op> :op :di-state ... :tail}}]}"
   [minmax-state minmax-props]
 
   (let [[agent op-agent] [(:agent minmax-props) (:agent minmax-props)]]
 
     (if (term-search? minmax-state minmax-props)
-      (let [di-score (stat-eval minmax-state minmax-props agent)]
-        {:max-val di-score :tail nil})
+      (let [evl (stat-eval minmax-state minmax-props agent)]
+        {:evl evl :tail nil})
 
-      (let [ops (next-ops minmax-state op-agent)
-            ops-and-results (assoc-ops-with-res minmax-state op-agent ops)
-            ops-and-res-tick (progress-tick minmax-props op-agent ops-and-results)
-            next-op-and-score (next-state-max minmax-state ops-and-res-tick minmax-props)]
+      (let [
+            ticked-state (progress-tick-state minmax-state minmax-props op-agent)
+            ops (next-ops ticked-state op-agent)
+            ;ops (next-ops minmax-state op-agent)
 
-        {:max-val (:max-val next-op-and-score) :tail next-op-and-score}
-        ))))
+            ops-and-results (compute-ops ticked-state op-agent ops)
+            ;ops-and-results (compute-ops minmax-state op-agent ops)
+            ;ops-and-res-tick (progress-tick minmax-props op-agent ops-and-results)
+
+            ;maximal-m-ogdmt (max-m-ogdmt minmax-state minmax-props ops-and-res-tick)
+            maximal-m-ogdmt (max-m-ogdmt ticked-state minmax-props ops-and-results)
+
+            ]
+
+        maximal-m-ogdmt))))
 
 (defn min-value
-  "The other player plays ->
-   will try to choose the min for the first player"
+  "From a state - run all possible ops recursively
+  and return the one with the minimal score
+  returns: M-OGDMT"
   [minmax-state minmax-props]
-
   (let [[agent op-agent] [(:agent minmax-props) (:other-agent minmax-props)]]
 
     (if (term-search? minmax-state minmax-props)
-      (let [di-score (stat-eval minmax-state minmax-props agent)]
-        {:min-val di-score :tail nil})
+      (let [evl (stat-eval minmax-state minmax-props agent)]
+        {:evl evl :tail nil})
 
-      (let [ops (next-ops minmax-state op-agent)
-            ops-and-results (assoc-ops-with-res minmax-state op-agent ops)
-            ops-and-res-tick (progress-tick minmax-props op-agent ops-and-results)
-            next-op-and-score (next-state-min minmax-state ops-and-res-tick minmax-props)]
-        {:min-val (:min-val next-op-and-score) :tail next-op-and-score}
-        ))))
+      (let [
+            ticked-state (progress-tick-state minmax-state minmax-props op-agent)
+            ops (next-ops ticked-state op-agent)
+            ;ops (next-ops minmax-state op-agent)
 
+            ops-and-results (compute-ops ticked-state op-agent ops)
+            ;ops-and-results (compute-ops minmax-state op-agent ops)
+            ;ops-and-res-tick (progress-tick minmax-props op-agent ops-and-results)
 
+            ;minimal-m-ogdmt (min-m-ogdmt minmax-state minmax-props ops-and-res-tick)]
+            minimal-m-ogdmt (min-m-ogdmt ticked-state minmax-props ops-and-results)
+            ]
 
-(defn adversarial-maxifier [res-and-val]
-  (-> res-and-val :max-val :score ((juxt first #(- (second %))))))
-
-(defn rev-identity-maxifier [res-and-val]
-  (into [] (reverse (adversarial-maxifier res-and-val))))
+        minimal-m-ogdmt))))
 
 (defn min-max [graph-desc di-state agent-order]
-  (log/debug (str (first agent-order)) ">>> " (:remaining-people graph-desc))
+
+  (log/info (str (first agent-order)) ">>> " (:remaining-people graph-desc))
 
   (let [time-progressor (first (filter #(= (:name %) "Bob") agent-order))
         initial-minmax-state (MinMaxState. graph-desc di-state own-heuristic agent-order)
-        initial-minmax-props (MinMaxNodeProps. 0 adversarial-maxifier time-progressor (first agent-order) (second agent-order))
+        initial-minmax-props (MinMaxNodeProps. 0 time-progressor (first agent-order) (second agent-order))
         op-agent (first agent-order)]
 
-    (let [ops (next-ops initial-minmax-state op-agent)
-          ops-and-results (assoc-ops-with-res initial-minmax-state op-agent ops)
-          maps-with-max-vals (into [] (map #(assoc-res-with-min-val % initial-minmax-state initial-minmax-props) ops-and-results))]
+    (let [m-o-vec (next-ops initial-minmax-state op-agent)
+          m-ogd-vec (compute-ops initial-minmax-state op-agent m-o-vec)
+          m-ogdmt-vec (into [] (map #(assoc-res-with-min-val % initial-minmax-state initial-minmax-props) m-ogd-vec))]
 
-      (doseq [m maps-with-max-vals]
-        (log/debug  (str (first agent-order)) " &>>" (:max-val m) (into {} (:op m)) (tail-summary-str m)))
+      (doseq [m m-ogdmt-vec]
+        (log/info (str (first agent-order)) " &>>" (:evl m) (into {} (:op m))
+          (tail-summary-str m)
+          ))
 
       (:op
-
-        (last (sort-by adversarial-maxifier maps-with-max-vals))
-
-        ))))
+        (log/spy (last (sort-by player-max-sort-key m-ogdmt-vec)))))))
