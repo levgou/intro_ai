@@ -19,7 +19,8 @@
 (declare assoc-res-with-min-val)
 (declare assoc-op-with-res)
 
-(def MAX-DEPTH 9)
+(def MAX-DEPTH 20)
+(def ALPHA_BETA_PRUNE true)
 
 (defn player-max-sort-key
   "sort key - that will maximize the score of the first agent - second agent"
@@ -31,10 +32,17 @@
   [m-ogdmt]
   (- (player-max-sort-key m-ogdmt)))
 
-(defrecord MinMaxState [graph-desc di-state heuristic agent-order]
+(defn own-heuristic
+  [{graph-desc :graph-desc di-state :di-state :as minmax-state} agent]
+  (agent-heuristic graph-desc di-state agent))
+
+(defrecord MinMaxState [graph-desc di-state heuristic agent-order alpha beta]
   Object
   (toString [x] (str (select-keys x [:agent-order]))))
 (defmethod print-method MinMaxState [x ^java.io.Writer w] (.write w (str "MMS:" x)))
+
+(defn make-init-state [graph-desc di-state agent-order]
+  (MinMaxState. graph-desc di-state own-heuristic agent-order -INF INF))
 
 (defn inc-depth [{agent-order :agent-order graph-desc :graph-desc di-state :di-state} depth]
   (let [op-agent (first agent-order)
@@ -92,10 +100,6 @@
   (toString [x] (str (into {} x))))
 (defmethod print-method M-OGDMT [x ^java.io.Writer w] (.write w (str "M-OGDMT:" x)))
 (defn make-m-ogdmt [m-ogd evl tail] (map->M-OGDMT (assoc m-ogd :evl evl :tail tail)))
-
-(defn own-heuristic
-  [{graph-desc :graph-desc di-state :di-state :as minmax-state} agent]
-  (agent-heuristic graph-desc di-state agent))
 
 (defn stat-eval
   "return Evaluation of current state according to agent"
@@ -169,17 +173,65 @@
                   (assoc minmax-props :depth incr-depth))]
     m-ogdmt))
 
+(defn calc-and-prune-larger-beta
+  "calc max val for each OGD, until bigger than beta and
+  then its useless to cont. because beta will be chosen by the minimizer
+  return a vec of M-OGDMT"
+  [calc-val minmax-state m-ogd-vec]
+
+  (loop [[m-ogd & others] m-ogd-vec
+         m-ogdmt-vec []
+         {alpha :alpha beta :beta :as cur-state} minmax-state]
+
+        (if (nil? m-ogd) m-ogdmt-vec
+
+          (let [m-ogdmt (calc-val cur-state m-ogd)
+                cur-score (player-max-sort-key m-ogdmt)
+                new-alpha-state (assoc cur-state :alpha (max alpha cur-score))
+                results (conj m-ogdmt-vec m-ogdmt)]
+
+            (if (>= cur-score beta)
+              results
+              (recur others results new-alpha-state))))))
+
+(defn calc-and-prune-smaller-alpha
+  "calc min val for each OGD, until lesser than alpha and
+  then its useless to cont. because alpha will be chosen by the maximizer
+  return a vec of M-OGDMT"
+  [calc-val minmax-state m-ogd-vec]
+
+  (loop [[m-ogd & others] m-ogd-vec
+         m-ogdmt-vec []
+         {alpha :alpha beta :beta :as cur-state} minmax-state]
+
+    (if (nil? m-ogd) m-ogdmt-vec
+
+      (let [m-ogdmt (calc-val cur-state m-ogd)
+            cur-score (player-max-sort-key m-ogdmt)
+            new-beta-state (assoc cur-state :beta (min beta cur-score))
+            results (conj m-ogdmt-vec m-ogdmt)]
+
+        (if (<= cur-score alpha)
+          results
+          (recur others results new-beta-state))))))
+
 (defn calc-m-ogdmt-vec-max
   "Calculate max scores for op results"
   [minmax-state minmax-props m-ogd-vec]
-  (let [calc-val #(inc-depth-calc-val minmax-state minmax-props assoc-res-with-max-val %)]
-    (into [] (map calc-val m-ogd-vec))))
+  (let [calc-val #(inc-depth-calc-val %1 minmax-props assoc-res-with-max-val %2)
+        calc-val-const-state (partial calc-val minmax-state)]
+    (if ALPHA_BETA_PRUNE
+      (calc-and-prune-smaller-alpha calc-val minmax-state m-ogd-vec)
+      (into [] (map calc-val-const-state m-ogd-vec)))))
 
 (defn calc-m-ogdmt-vec-min
-  "Calculate max scores for op results"
+  "Calculate min scores for op results"
   [minmax-state minmax-props m-ogd-vec]
-  (let [calc-val #(inc-depth-calc-val minmax-state minmax-props assoc-res-with-min-val %)]
-    (into [] (map calc-val m-ogd-vec))))
+  (let [calc-val #(inc-depth-calc-val %1 minmax-props assoc-res-with-min-val %2)
+        calc-val-const-state (partial calc-val minmax-state)]
+    (if ALPHA_BETA_PRUNE
+      (calc-and-prune-larger-beta calc-val minmax-state m-ogd-vec)
+      (into [] (map calc-val-const-state m-ogd-vec)))))
 
 (defn max-m-ogdmt
   "Calculate max scores for op results and return the maximal"
@@ -258,7 +310,7 @@
   (log/info (str (first agent-order)) ">>> " (:remaining-people graph-desc))
 
   (let [time-progressor (first (filter #(= (:name %) "Bob") agent-order))
-        initial-minmax-state (MinMaxState. graph-desc di-state own-heuristic agent-order)
+        initial-minmax-state (make-init-state graph-desc di-state agent-order)
         initial-minmax-props (MinMaxNodeProps. 0 time-progressor (first agent-order) (second agent-order))
         op-agent (first agent-order)]
 
@@ -268,8 +320,8 @@
 
       (doseq [m m-ogdmt-vec]
         (log/info (str (first agent-order)) " &>>" (:evl m) (into {} (:op m))
-          (tail-summary-str m)
+          ;(tail-summary-str m)
           ))
 
       (:op
-        (log/spy (last (sort-by player-max-sort-key m-ogdmt-vec)))))))
+        (last (sort-by player-max-sort-key m-ogdmt-vec))))))

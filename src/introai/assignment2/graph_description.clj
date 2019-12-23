@@ -89,7 +89,7 @@
    new-graph-struct]
 
   (let [new-num-nodes (count (graph/nodes new-graph-struct))
-        new-node-infos (merge node-infos (log/spy (node-info-for-mid-edge-nodes new-graph-struct)))
+        new-node-infos (merge node-infos (node-info-for-mid-edge-nodes new-graph-struct))
         new-edge-infos (merge edge-infos (edge-info-for-mid-edge-edges new-graph-struct))]
     (GraphProps. new-num-nodes shelters new-node-infos new-edge-infos)))
 
