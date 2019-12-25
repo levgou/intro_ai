@@ -16,8 +16,6 @@
 (declare assoc-res-with-max-val)
 (declare assoc-op-with-res)
 
-(def MAX-DEPTH 9)
-
 (defrecord MaxMaxState [graph-desc di-state heuristic agent-order]
   Object
   (toString [x] (str (select-keys x [:agent-order]))))
@@ -48,14 +46,14 @@
 (defn make-eval [score-vec h-vec g-vec cutoff maxmax-props agent]
   (Evaluation. score-vec h-vec g-vec cutoff (:depth maxmax-props) (str agent) (nano-id 5)))
 
-(defn cutoff-maxmax [maxmax-props]
+(defn cutoff-maxmax [maxmax-props cutoff-depth]
   (log/debug "Depth cutoff!")
-  (< MAX-DEPTH (:depth maxmax-props)))
+  (< cutoff-depth (:depth maxmax-props)))
 
 (defn term-search? [{di-state :di-state agent-order :agent-order} maxmax-props]
   (or
     (both-agents-terminated di-state agent-order)
-    (cutoff-maxmax maxmax-props)))
+    (cutoff-maxmax maxmax-props (-> agent-order first :cutoff-depth))))
 
 (defrecord M-O [op]
   Object
@@ -187,24 +185,17 @@
         maximal-m-ogdmt))))
 
 
-(defn identity-maxifier
-  "sort key - that will maximize the score of the first agent"
-  [m-ogdmt]
-  (-> m-ogdmt :evl :scores))
-
-(defn rev-identity-maxifier
-  "sort key - that will maximize the score of the second agent"
-  [res-and-val]
-  (into [] (reverse (identity-maxifier res-and-val))))
 
 
 (defn max-max [graph-desc di-state agent-order]
 
   (log/debug (str (first agent-order)) ">>> " (:remaining-people graph-desc))
 
-  (let [time-progressor (first (filter #(= (:name %) "Bob") agent-order))
+  (let [maxifier1 (:maxifier1 (first agent-order))
+        maxifier2 (:maxifier2 (first agent-order))
+        time-progressor (first (filter #(= (:name %) "Bob") agent-order))
         initial-maxmax-state (MaxMaxState. graph-desc di-state own-heuristic agent-order)
-        initial-maxmax-props (MaxMaxNodeProps. 0 identity-maxifier rev-identity-maxifier time-progressor (first agent-order))
+        initial-maxmax-props (MaxMaxNodeProps. 0 maxifier1 maxifier2 time-progressor (first agent-order))
         op-agent (first agent-order)]
 
     (let [m-o-vec (next-ops initial-maxmax-state op-agent)
@@ -212,7 +203,7 @@
           m-ogdmt-vec (into [] (map #(assoc-res-with-max-val % initial-maxmax-state initial-maxmax-props) m-ogd-vec))]
 
       (doseq [m m-ogdmt-vec]
-        (log/info (str (first agent-order)) " &>>" (:evl m) (into {} (:op m)) (tail-summary-str m)))
+        (log/debug (str (first agent-order)) " &>>" (:evl m) (into {} (:op m)) (tail-summary-str m)))
 
       (:op
-        (last (sort-by identity-maxifier m-ogdmt-vec))))))
+        (last (sort-by maxifier1 m-ogdmt-vec))))))

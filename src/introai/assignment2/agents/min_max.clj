@@ -7,10 +7,9 @@
      [tail-summary-str calc-agent-score both-agents-terminated progress-tick progress-tick-state]]
     [introai.utils.log :as log]
     [introai.utils.const :refer [INF -INF]]
-    [introai.utils.const :as E]
     [nano-id.core :refer [nano-id]]
     [introai.utils.graphs :as gutils]
-    [introai.assignment2.graph-description :as gd]))
+    ))
 
 
 (declare max-value)
@@ -19,18 +18,7 @@
 (declare assoc-res-with-min-val)
 (declare assoc-op-with-res)
 
-(def MAX-DEPTH 20)
 (def ALPHA_BETA_PRUNE true)
-
-(defn player-max-sort-key
-  "sort key - that will maximize the score of the first agent - second agent"
-  [m-ogdmt]
-  (-> m-ogdmt :evl :scores ((fn [[p1 p2]] (- p1 p2)))))
-
-(defn player-min-sort-key
-  "sort key - that will minimize the score of the first agent - second agent"
-  [m-ogdmt]
-  (- (player-max-sort-key m-ogdmt)))
 
 (defn own-heuristic
   [{graph-desc :graph-desc di-state :di-state :as minmax-state} agent]
@@ -69,14 +57,14 @@
 (defn make-eval [score-vec h-vec g-vec cutoff minmax-props agent other-agent agent-state]
   (Evaluation. score-vec h-vec g-vec cutoff (:depth minmax-props) (str agent) (str other-agent) agent-state (nano-id 5)))
 
-(defn cutoff-maxmax [minmax-props]
+(defn cutoff-maxmax [minmax-props cutoff-depth]
   (log/debug "Depth cutoff!")
-  (< MAX-DEPTH (:depth minmax-props)))
+  (< cutoff-depth (:depth minmax-props)))
 
 (defn term-search? [{di-state :di-state agent-order :agent-order} minmax-props]
   (or
     (both-agents-terminated di-state agent-order)
-    (cutoff-maxmax minmax-props)))
+    (cutoff-maxmax minmax-props (-> agent-order first :cutoff-depth))))
 
 (defrecord M-O [op]
   Object
@@ -179,20 +167,23 @@
   return a vec of M-OGDMT"
   [calc-val minmax-state m-ogd-vec]
 
-  (loop [[m-ogd & others] m-ogd-vec
-         m-ogdmt-vec []
-         {alpha :alpha beta :beta :as cur-state} minmax-state]
+  (let [player-max-sort-key (:maxifier1 (first (:agent-order minmax-state)))]
 
-        (if (nil? m-ogd) m-ogdmt-vec
+    (loop [[m-ogd & others] m-ogd-vec
+           m-ogdmt-vec []
+           {alpha :alpha beta :beta :as cur-state} minmax-state]
 
-          (let [m-ogdmt (calc-val cur-state m-ogd)
-                cur-score (player-max-sort-key m-ogdmt)
-                new-alpha-state (assoc cur-state :alpha (max alpha cur-score))
-                results (conj m-ogdmt-vec m-ogdmt)]
+      (if (nil? m-ogd)
+        m-ogdmt-vec
 
-            (if (>= cur-score beta)
-              results
-              (recur others results new-alpha-state))))))
+        (let [m-ogdmt (calc-val cur-state m-ogd)
+              cur-score (player-max-sort-key m-ogdmt)
+              new-alpha-state (assoc cur-state :alpha (max alpha cur-score))
+              results (conj m-ogdmt-vec m-ogdmt)]
+
+          (if (>= cur-score beta)
+            results
+            (recur others results new-alpha-state)))))))
 
 (defn calc-and-prune-smaller-alpha
   "calc min val for each OGD, until lesser than alpha and
@@ -200,20 +191,22 @@
   return a vec of M-OGDMT"
   [calc-val minmax-state m-ogd-vec]
 
-  (loop [[m-ogd & others] m-ogd-vec
-         m-ogdmt-vec []
-         {alpha :alpha beta :beta :as cur-state} minmax-state]
+  (let [player-max-sort-key (:maxifier1 (first (:agent-order minmax-state)))]
+    (loop [[m-ogd & others] m-ogd-vec
+           m-ogdmt-vec []
+           {alpha :alpha beta :beta :as cur-state} minmax-state]
 
-    (if (nil? m-ogd) m-ogdmt-vec
+      (if (nil? m-ogd)
+        m-ogdmt-vec
 
-      (let [m-ogdmt (calc-val cur-state m-ogd)
-            cur-score (player-max-sort-key m-ogdmt)
-            new-beta-state (assoc cur-state :beta (min beta cur-score))
-            results (conj m-ogdmt-vec m-ogdmt)]
+        (let [m-ogdmt (calc-val cur-state m-ogd)
+              cur-score (player-max-sort-key m-ogdmt)
+              new-beta-state (assoc cur-state :beta (min beta cur-score))
+              results (conj m-ogdmt-vec m-ogdmt)]
 
-        (if (<= cur-score alpha)
-          results
-          (recur others results new-beta-state))))))
+          (if (<= cur-score alpha)
+            results
+            (recur others results new-beta-state)))))))
 
 (defn calc-m-ogdmt-vec-max
   "Calculate max scores for op results"
@@ -237,7 +230,8 @@
   "Calculate max scores for op results and return the maximal"
   [minmax-state minmax-props m-ogd-vec]
 
-  (let [m-ogdmt-vec (calc-m-ogdmt-vec-min minmax-state minmax-props m-ogd-vec)
+  (let [player-max-sort-key (:maxifier1 (first (:agent-order minmax-state)))
+        m-ogdmt-vec (calc-m-ogdmt-vec-min minmax-state minmax-props m-ogd-vec)
         max-m-ogdmt (last (sort-by player-max-sort-key m-ogdmt-vec))]
     (log/debug "Out of " (into [] (map :evl m-ogdmt-vec)) "the maximal: " (:evl max-m-ogdmt))
     max-m-ogdmt))
@@ -246,7 +240,8 @@
   "Calculate min scores for op results and return the minimal"
   [minmax-state minmax-props m-ogd-vec]
 
-  (let [m-ogdmt-vec (calc-m-ogdmt-vec-max minmax-state minmax-props m-ogd-vec)
+  (let [player-min-sort-key (:maxifier2 (first (:agent-order minmax-state)))
+        m-ogdmt-vec (calc-m-ogdmt-vec-max minmax-state minmax-props m-ogd-vec)
         min-m-ogdmt (last (sort-by player-min-sort-key m-ogdmt-vec))]
     (log/debug "Out of " (into [] (map :evl m-ogdmt-vec)) "the minimal: " (:evl min-m-ogdmt))
     min-m-ogdmt))
@@ -263,19 +258,10 @@
       (let [evl (stat-eval minmax-state minmax-props agent)]
         {:evl evl :tail nil})
 
-      (let [
-            ticked-state (progress-tick-state minmax-state minmax-props op-agent)
+      (let [ticked-state (progress-tick-state minmax-state minmax-props op-agent)
             ops (next-ops ticked-state op-agent)
-            ;ops (next-ops minmax-state op-agent)
-
             ops-and-results (compute-ops ticked-state op-agent ops)
-            ;ops-and-results (compute-ops minmax-state op-agent ops)
-            ;ops-and-res-tick (progress-tick minmax-props op-agent ops-and-results)
-
-            ;maximal-m-ogdmt (max-m-ogdmt minmax-state minmax-props ops-and-res-tick)
-            maximal-m-ogdmt (max-m-ogdmt ticked-state minmax-props ops-and-results)
-
-            ]
+            maximal-m-ogdmt (max-m-ogdmt ticked-state minmax-props ops-and-results)]
 
         maximal-m-ogdmt))))
 
@@ -290,26 +276,19 @@
       (let [evl (stat-eval minmax-state minmax-props agent)]
         {:evl evl :tail nil})
 
-      (let [
-            ticked-state (progress-tick-state minmax-state minmax-props op-agent)
+      (let [ticked-state (progress-tick-state minmax-state minmax-props op-agent)
             ops (next-ops ticked-state op-agent)
-            ;ops (next-ops minmax-state op-agent)
-
             ops-and-results (compute-ops ticked-state op-agent ops)
-            ;ops-and-results (compute-ops minmax-state op-agent ops)
-            ;ops-and-res-tick (progress-tick minmax-props op-agent ops-and-results)
-
-            ;minimal-m-ogdmt (min-m-ogdmt minmax-state minmax-props ops-and-res-tick)]
-            minimal-m-ogdmt (min-m-ogdmt ticked-state minmax-props ops-and-results)
-            ]
+            minimal-m-ogdmt (min-m-ogdmt ticked-state minmax-props ops-and-results)]
 
         minimal-m-ogdmt))))
 
 (defn min-max [graph-desc di-state agent-order]
 
-  (log/info (str (first agent-order)) ">>> " (:remaining-people graph-desc))
+  (log/debug (str (first agent-order)) ">>> " (:remaining-people graph-desc))
 
   (let [time-progressor (first (filter #(= (:name %) "Bob") agent-order))
+        player-max-sort-key (:maxifier1 (first agent-order))
         initial-minmax-state (make-init-state graph-desc di-state agent-order)
         initial-minmax-props (MinMaxNodeProps. 0 time-progressor (first agent-order) (second agent-order))
         op-agent (first agent-order)]
@@ -319,9 +298,9 @@
           m-ogdmt-vec (into [] (map #(assoc-res-with-min-val % initial-minmax-state initial-minmax-props) m-ogd-vec))]
 
       (doseq [m m-ogdmt-vec]
-        (log/info (str (first agent-order)) " &>>" (:evl m) (into {} (:op m))
-          ;(tail-summary-str m)
-          ))
+        (log/debug (str (first agent-order)) " &>>" (:evl m) (into {} (:op m))
+                  (tail-summary-str m)
+                  ))
 
       (:op
         (last (sort-by player-max-sort-key m-ogdmt-vec))))))

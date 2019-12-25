@@ -10,9 +10,7 @@
 
 
 (def MAX_EXPAND-LIMIT 100000)
-;
-;(def gen-edge gutils/edge-from-state-target-node)
-;
+
 (defn closest-shelter [graph-struct src shelters]
   (apply min-key second (map #(vector % (gutils/shortest-path-len graph-struct src %))
                              shelters)))
@@ -110,38 +108,6 @@
 (defn agent-heuristic [graph-desc di-state agent]
   (heuristic graph-desc (gs/state-of di-state agent) (:time di-state)))
 
-;(defn goal? [{state :state}]
-;  (gs/term? state))
-;
-;(defn next-state [{graph-struct :structure :as graph-desc} next-node state]
-;  (op/edge graph-desc
-;           (gen-edge graph-struct state next-node)
-;           state))
-;
-;(defn term-state [graph-desc state]
-;  (let [terminated-state (op/term graph-desc state)]
-;    {
-;     :g     (:score terminated-state)
-;     :h     0
-;     :state terminated-state
-;     :op    (op/partial-term graph-desc)
-;     }))
-;
-;(defn successor-state-map [graph-desc next-node state]
-;  (let [new-state (next-state graph-desc next-node state)]
-;    (if (gs/term? new-state)
-;      (term-state graph-desc new-state)
-;      {
-;       :g     0
-;       :h     (heuristic graph-desc new-state)
-;       :state new-state
-;       :op    (op/partial-edge graph-desc state (:agent-node new-state))
-;       })))
-;
-;(defn edge-states [graph-desc neighbours state]
-;  (map #(successor-state-map graph-desc % state) neighbours))
-;
-
 (defn agent-term? [cur-di-state agent] (gs/term? (gs/state-of cur-di-state agent)))
 (defn agent-active? [cur-di-state agent] (not (agent-term? cur-di-state agent)))
 (defn mid-edge? [graph-desc di-state agent] (->> (gs/state-of di-state agent)
@@ -188,6 +154,28 @@
         ;  (log/debug ">" (log/state-node next-state-map)))
         next-ops))))
 
-;(defn gen-state-expander
-;  [graph-desc]
-;  #(expand graph-desc %))
+
+(defn player-max-sort-key
+  "sort key - that will maximize the score of the first agent - second agent"
+  [m-ogdmt]
+  (-> m-ogdmt :evl :scores ((fn [[p1 p2]] (- p1 p2)))))
+
+(defn player-min-sort-key
+  "sort key - that will minimize the score of the first agent - second agent"
+  [m-ogdmt]
+  (- (player-max-sort-key m-ogdmt)))
+
+(defn identity-maxifier
+  "sort key - that will maximize the score of the first agent"
+  [m-ogdmt]
+  (-> m-ogdmt :evl :scores))
+
+(defn rev-identity-maxifier
+  "sort key - that will maximize the score of the second agent"
+  [res-and-val]
+  (into [] (reverse (identity-maxifier res-and-val))))
+
+(defn coop-maxifier
+  "sort key to max the sum of scores"
+  [m-ogdmt]
+  (->> m-ogdmt :evl :scores (apply +)))
