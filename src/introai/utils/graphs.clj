@@ -6,7 +6,7 @@
             [clojure.core.strint :refer [<<]]
             [introai.utils.collections :refer [pairwise-collection]]
             [introai.utils.log :as log]
-            [introai.assignment2.game-state :as gs]
+            [introai.assignment3.game-state :as gs]
             ))
 
 
