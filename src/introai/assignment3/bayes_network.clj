@@ -3,6 +3,8 @@
   (:require
     [loom.graph :as graph]
     [loom.alg :as g-alg]
+    [introai.utils.log :as log]
+    [clojure.core.strint :refer [<<]]
     ))
 
 ;;  Fl(v,t) standing in for "flooding" at vertex v at time t,
@@ -22,6 +24,12 @@
 
 (declare look-up-flood)
 
+(def NO_FLOOD_BLOCK_PROBA 0.001)
+(def ONE_FLOOD_BLOCK_PROBA 0.6)
+(def TWO_FLOOD_BLOCK_PROBA 0.84)
+
+(def LINE_SEP (clojure.string/join "" (repeat 80 "=")))
+
 (defrecord VertexNode [name proba t]
   Object
   (toString [vn] (str "VertexNode: " (into {} vn))))
@@ -38,19 +46,21 @@
 
 (defn gen-edge-node [u v] (apply ->EdgeNode (concat (sort [u v]) [0])))
 
-(defrecord BayesNet [structure t])
+(defrecord BayesNet [structure t persistence])
+
+(defn dec-t [vertex] (update vertex :t - 1))
 
 (defn prev-time-flood-proba
   [b-net vertex persistence]
   (*
     persistence
-    (look-up-flood b-net (update vertex :t - 1) persistence)))
+    (look-up-flood b-net (dec-t vertex) persistence)))
 
 (defn prev-time-no-flood-proba
   [b-net vertex persistence]
   (*
     (:proba vertex)
-    (- 1 (look-up-flood b-net vertex persistence))))
+    (- 1 (look-up-flood b-net (dec-t vertex) persistence))))
 
 (defn look-up-flood
   [b-net vertex persistence]
@@ -61,36 +71,31 @@
       (prev-time-no-flood-proba b-net vertex persistence)
       )))
 
-(defn look-up-block
-  [b-net vertex persistence]
-  (let [[u v] (graph/predecessors b-net vertex)]
-    ))
+;(defn look-up-block
+;  [b-net edge-node src-floods dest-floods persistence]
+;  (if (zero? (:t edge-node)))
+;
+;  (let [[u v] (graph/predecessors b-net edge-node)]
+;    0))
+
+(defn edges-for-edge-node
+  [v-name_t->vertex {:keys [src dest t] :as edge-node}]
+  [[(v-name_t->vertex [src t]) edge-node], [(v-name_t->vertex [dest t]) edge-node]])
 
 (defn gen-b-edges
-  [v-name->vertex edge-nodes]
+  [v-name_t->vertex edge-nodes]
   (->> edge-nodes
-       (map (fn [{src :src dest :dest :as edge-node}]
-              [[(v-name->vertex src) edge-node], [(v-name->vertex dest) edge-node]]))
-
+       (map #(edges-for-edge-node v-name_t->vertex %))
        (mapcat identity)))
 
-(defn map-name->newest-vertex
-  [vertex-nodes t]
-  (let [newest-vertex (filter #(= t (:t %)) vertex-nodes)]
-    (zipmap (map :name newest-vertex) newest-vertex)))
+(defn map-name->vertex
+  [vertex-nodes]
+  (zipmap (map (juxt :name :t) vertex-nodes) vertex-nodes))
 
 (defn extract-init-probas
   [{{node-infos :nodes} :props}]
   (zipmap (keys node-infos)
           (map :flood-prob (vals node-infos))))
-
-(defn gen-bayes-net
-  [edge-nodes vertex-nodes t]
-  (let [name->vertex (map-name->newest-vertex vertex-nodes t)
-        b-edges (gen-b-edges name->vertex edge-nodes)
-        b-net-struct (apply graph/digraph b-edges)]
-
-    (BayesNet. b-net-struct t)))
 
 (defn gen-b-net-t-0
   [{g-struct :structure :as g-desc}]
@@ -99,11 +104,11 @@
         g-nodes (graph/nodes g-struct)
         edge-nodes (map #(gen-edge-node (first %) (second %)) g-edges)
         vertex-nodes (map #(time-zero-vertex-node % initial-flood-proba-map) g-nodes)
-        name->vertex (map-name->newest-vertex vertex-nodes 0)
-        b-edges (gen-b-edges name->vertex edge-nodes)
+        name_t->vertex (map-name->vertex vertex-nodes)
+        b-edges (gen-b-edges name_t->vertex edge-nodes)
         b-net-struct (apply graph/digraph b-edges)]
 
-    (BayesNet. b-net-struct 0)))
+    (BayesNet. b-net-struct 0 0.9)))
 
 
 (defn filter-vertices
@@ -114,6 +119,21 @@
   [b-struct]
   (remove :proba (graph/nodes b-struct)))
 
+(defn filter-nodes-t
+  [b-net node-type-filter t]
+  (->> b-net
+       :structure
+       node-type-filter
+       (filter #(= t (:t %)))))
+
+(defn filter-vertices-t
+  [b-net t]
+  (filter-nodes-t b-net filter-vertices t))
+
+(defn filter-edges-t
+  [b-net t]
+  (filter-nodes-t b-net filter-edges t))
+
 (defn gen-new-b-vertex-nodes
   [{structure :structure t :t}]
   (let [vertex-nodes (filter-vertices structure)
@@ -122,10 +142,10 @@
     (concat vertex-nodes new-nodes)))
 
 (defn gen-new-b-edge-nodes
-  [{structure :structure}]
+  [{structure :structure t :t}]
   (let [edge-nodes (filter-edges structure)
-        new-nodes (map #(update % :t inc) edge-nodes)]
-    new-nodes))
+        new-nodes (map #(update % :t inc) (filter #(= t (:t %)) edge-nodes))]
+    (concat edge-nodes new-nodes)))
 
 (defn gen-vertex-vertex-edges
   [new-b-vertex-nodes]
@@ -136,14 +156,63 @@
     (into [] edge-map)))
 
 (defn progress-t-b-net
-  [b-net]
+  [{persistence :persistence t :t :as b-net}]
   (let [t+1 (inc (:t b-net))
         new-b-vertex-nodes (gen-new-b-vertex-nodes b-net)
         new-b-edge-nodes (gen-new-b-edge-nodes b-net)
-        name->vertex (map-name->newest-vertex new-b-vertex-nodes t+1)
-        edge-vertex-edges (gen-b-edges name->vertex new-b-edge-nodes)
+        name_t->vertex (map-name->vertex new-b-vertex-nodes)
+        edge-vertex-edges (gen-b-edges name_t->vertex new-b-edge-nodes)
         vertex-vertex-edges (gen-vertex-vertex-edges new-b-vertex-nodes)
         all-new-edges (concat vertex-vertex-edges edge-vertex-edges)
         b-net-struct (apply graph/digraph all-new-edges)
         ]
-    (BayesNet. b-net-struct t+1)))
+    (BayesNet. b-net-struct t+1 persistence)))
+
+(defn print-vertex
+  [{persistence :persistence :as b-net} {:keys [proba name t] :as vertex-node}]
+  (let [p-not-flood (- 1 proba)]
+
+    (println "")
+    (println "VERTEX" name "time" t ":")
+
+    (if (= 0 t)
+      (do
+        (println "  P(Flooding)      = " proba)
+        (println "  P(not Flooding)  = " p-not-flood))
+      (do
+        (println (<< "  P(Flooding |     Flooding t=~{(- t 1)})  =  ~{persistence}"))
+        (println (<< "  P(Flooding | not Flooding t=~{(- t 1)})  =  ~{proba}"))
+
+        ))))
+
+(defn print-edge
+  [b-net {:keys [src dest t]}]
+
+  (println "")
+  (println "EDGE" src "->" dest "time" t ":")
+  (println (<< "  P(Block | no flood ~{src}, no flood ~{dest} [t=~{t}]) = ") NO_FLOOD_BLOCK_PROBA)
+  (println (<< "  P(Block |    flood ~{src}, no flood ~{dest} [t=~{t}]) = ") ONE_FLOOD_BLOCK_PROBA)
+  (println (<< "  P(Block | no flood ~{src},    flood ~{dest} [t=~{t}]) = ") ONE_FLOOD_BLOCK_PROBA)
+  (println (<< "  P(Block |    flood ~{src},    flood ~{dest} [t=~{t}]) = ") TWO_FLOOD_BLOCK_PROBA))
+
+(defn print-b-net-t-vertices
+  [b-net t]
+  (let [vertex-nodes-t (filter-vertices-t b-net t)]
+    (doseq [vertex vertex-nodes-t] (print-vertex b-net vertex))))
+
+(defn print-b-net-t-edges
+  [b-net t]
+  (let [edge-nodes (filter-edges-t b-net t)]
+    (doseq [edge edge-nodes] (print-edge b-net edge))))
+
+(defn print-b-net-t
+  [b-net t]
+  (print-b-net-t-vertices b-net t)
+  (print-b-net-t-edges b-net t)
+  (println LINE_SEP))
+
+
+(defn print-b-net
+  [b-net]
+  (print-b-net-t b-net 0)
+  (print-b-net-t b-net 1))
