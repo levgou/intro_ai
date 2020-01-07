@@ -1,14 +1,13 @@
 #N 4                 ; number of vertices n in graph (from 1 to n)
 
-#V1 D5 S
-#V2 D5 P1
-#V3 D5 P1
-#V4 D5 P1
-
 #V1 F 0.2            ; Vertex 1, probability of flooding 0.2 at t=0
 #V2 F 0.4            ; Vertex 2, probability of flooding 0.4 at t=0
                      ; Either assume flooding probability 0 by default,
                      ; or make sure to specify this probability for all vertices.
+
+#V3 F 0.0
+#V4 F 0.0
+
 #Ppersistence 0.9    ; Set persistence probability to 0.9
 
 #E1 1 2 W1           ; Edge1 between vertices 1 and 2, weight 1

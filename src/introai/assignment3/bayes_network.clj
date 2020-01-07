@@ -69,31 +69,39 @@
 (defn gen-b-edges
   [v-name->vertex edge-nodes]
   (->> edge-nodes
-       (map #(vector [% (v-name->vertex (:src %))] [% (v-name->vertex (:dest %))]))
+       (map (fn [{src :src dest :dest :as edge-node}]
+              [[(v-name->vertex src) edge-node], [(v-name->vertex dest) edge-node]]))
+
        (mapcat identity)))
 
-(defn map-name->vertex
-  [vertex-nodes]
-  (zipmap (map :name vertex-nodes) vertex-nodes))
+(defn map-name->newest-vertex
+  [vertex-nodes t]
+  (let [newest-vertex (filter #(= t (:t %)) vertex-nodes)]
+    (zipmap (map :name newest-vertex) newest-vertex)))
+
+(defn extract-init-probas
+  [{{node-infos :nodes} :props}]
+  (zipmap (keys node-infos)
+          (map :flood-prob (vals node-infos))))
 
 (defn gen-bayes-net
   [edge-nodes vertex-nodes t]
-  (let [name->vertex (map-name->vertex vertex-nodes)
+  (let [name->vertex (map-name->newest-vertex vertex-nodes t)
         b-edges (gen-b-edges name->vertex edge-nodes)
         b-net-struct (apply graph/digraph b-edges)]
 
     (BayesNet. b-net-struct t)))
 
 (defn gen-b-net-t-0
-  [g-struct initial-flood-proba-map]
-  (let [g-edges (g-alg/distinct-edges g-struct)
+  [{g-struct :structure :as g-desc}]
+  (let [initial-flood-proba-map (extract-init-probas g-desc)
+        g-edges (g-alg/distinct-edges g-struct)
         g-nodes (graph/nodes g-struct)
         edge-nodes (map #(gen-edge-node (first %) (second %)) g-edges)
         vertex-nodes (map #(time-zero-vertex-node % initial-flood-proba-map) g-nodes)
-        name->vertex (map-name->vertex vertex-nodes)
+        name->vertex (map-name->newest-vertex vertex-nodes 0)
         b-edges (gen-b-edges name->vertex edge-nodes)
-        b-net-struct (apply graph/digraph b-edges)
-        ]
+        b-net-struct (apply graph/digraph b-edges)]
 
     (BayesNet. b-net-struct 0)))
 
@@ -107,10 +115,11 @@
   (remove :proba (graph/nodes b-struct)))
 
 (defn gen-new-b-vertex-nodes
-  [{structure :structure}]
+  [{structure :structure t :t}]
   (let [vertex-nodes (filter-vertices structure)
-        new-nodes (map #(update % :t inc) vertex-nodes)]
-    new-nodes))
+        newest-vertex-nodes (filter #(= t (:t %)) vertex-nodes)
+        new-nodes (map #(update % :t inc) newest-vertex-nodes)]
+    (concat vertex-nodes new-nodes)))
 
 (defn gen-new-b-edge-nodes
   [{structure :structure}]
@@ -120,19 +129,21 @@
 
 (defn gen-vertex-vertex-edges
   [new-b-vertex-nodes]
-  (into []
-        (zipmap new-b-vertex-nodes
-                (map #(update % :t dec) new-b-vertex-nodes))))
+  (let [t>0-vertices (filter #(< 0 (:t %)) new-b-vertex-nodes)
+        t-1-vertices (map #(update % :t dec) t>0-vertices)
+        edge-map (zipmap t-1-vertices t>0-vertices)]
+
+    (into [] edge-map)))
 
 (defn progress-t-b-net
   [b-net]
-  (let [new-t (inc (:t b-net))
+  (let [t+1 (inc (:t b-net))
         new-b-vertex-nodes (gen-new-b-vertex-nodes b-net)
         new-b-edge-nodes (gen-new-b-edge-nodes b-net)
-        name->vertex (map-name->vertex new-b-vertex-nodes)
+        name->vertex (map-name->newest-vertex new-b-vertex-nodes t+1)
         edge-vertex-edges (gen-b-edges name->vertex new-b-edge-nodes)
         vertex-vertex-edges (gen-vertex-vertex-edges new-b-vertex-nodes)
         all-new-edges (concat vertex-vertex-edges edge-vertex-edges)
         b-net-struct (apply graph/digraph all-new-edges)
         ]
-    (gen-bayes-net new-b-edge-nodes new-b-vertex-nodes new-t)))
+    (BayesNet. b-net-struct t+1)))

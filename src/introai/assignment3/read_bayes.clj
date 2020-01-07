@@ -75,7 +75,7 @@
   [g-list flood-probas]
   (->> g-list
        (filter-lines "#V")
-       (filter #(not (str/includes? % " F ")))
+       ;(filter #(not (str/includes? % " F ")))
        (map #(parse-node % flood-probas))
        (name-to-record)))
 
