@@ -98,7 +98,7 @@
           (map :flood-prob (vals node-infos))))
 
 (defn gen-b-net-t-0
-  [{g-struct :structure :as g-desc}]
+  [{g-struct :structure :as g-desc} persistence]
   (let [initial-flood-proba-map (extract-init-probas g-desc)
         g-edges (g-alg/distinct-edges g-struct)
         g-nodes (graph/nodes g-struct)
@@ -108,7 +108,7 @@
         b-edges (gen-b-edges name_t->vertex edge-nodes)
         b-net-struct (apply graph/digraph b-edges)]
 
-    (BayesNet. b-net-struct 0 0.9)))
+    (BayesNet. b-net-struct 0 persistence)))
 
 
 (defn filter-vertices
@@ -157,7 +157,7 @@
 
 (defn progress-t-b-net
   [{persistence :persistence t :t :as b-net}]
-  (let [t+1 (inc (:t b-net))
+  (let [t+1 (inc t)
         new-b-vertex-nodes (gen-new-b-vertex-nodes b-net)
         new-b-edge-nodes (gen-new-b-edge-nodes b-net)
         name_t->vertex (map-name->vertex new-b-vertex-nodes)
@@ -167,6 +167,11 @@
         b-net-struct (apply graph/digraph all-new-edges)
         ]
     (BayesNet. b-net-struct t+1 persistence)))
+
+(defn b-net-with-t
+  [b-net t]
+  (last (take (inc t) (iterate progress-t-b-net b-net))))
+
 
 (defn print-vertex
   [{persistence :persistence :as b-net} {:keys [proba name t] :as vertex-node}]
@@ -216,3 +221,20 @@
   [b-net]
   (print-b-net-t b-net 0)
   (print-b-net-t b-net 1))
+
+(defn proba-lut
+  [b-node parents-assign persistence]
+
+  (if (instance? VertexNode b-node)
+
+    ; VERTEX
+    (if (first parents-assign)
+      persistence
+      (:proba b-node))
+
+    ; EDGE
+    (let [parents-floods-count (count (filter true? parents-assign))]
+      (case parents-floods-count
+        2 TWO_FLOOD_BLOCK_PROBA
+        1 ONE_FLOOD_BLOCK_PROBA
+        0 NO_FLOOD_BLOCK_PROBA))))

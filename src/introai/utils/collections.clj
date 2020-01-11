@@ -22,3 +22,7 @@
 
 (defn dissoc-in [mapping keys]
   (update-in mapping (butlast keys) dissoc (last keys)))
+
+(defn maps-agree [constrained constrain]
+  (let [ks (keys constrain)]
+    (every? #(= (constrained %) (constrain %)) ks)))

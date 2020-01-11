@@ -9,7 +9,7 @@
 
 (defrecord NodeInfo [name dead-line num-persons has-shelter]
   Object
-  (toString [gs] (str "NodeInfo: " (into {} gs))))
+  (toString [gs] (str "NodeInfo: " (select-keys gs [:name :flood-prob]))))
 (defmethod print-method NodeInfo [gs ^java.io.Writer w] (.write w (str gs)))
 
 (defrecord BayesNodeInfo [name flood-prob]
@@ -22,7 +22,7 @@
   (toString [gs] (str "EdgeInfo: " (into {} gs))))
 (defmethod print-method EdgeInfo [gs ^java.io.Writer w] (.write w (str gs)))
 
-(defrecord GraphProps [num-nodes shelters nodes edges])
+(defrecord GraphProps [num-nodes persist nodes edges])
 
 (defrecord GraphDescription [structure props remaining-people]
   Object

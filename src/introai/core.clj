@@ -1,6 +1,7 @@
 (ns introai.core
   (:gen-class)
   (:require [introai.assignment3.run-game :refer [run-from-opts opt-parser]]
+            [introai.assignment3.main-loop :refer [main-loop]]
             [clojure.pprint :refer [pprint]]))
 
 

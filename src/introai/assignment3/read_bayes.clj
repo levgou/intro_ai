@@ -34,7 +34,6 @@
 
 (defn name-to-record
   [records]
-  (println records)
   (zipmap (map :name records) records))
 
 (defn parse-num-nodes
