@@ -66,7 +66,7 @@
       (Evidence. (EVIDENCE_OPTIONS evidence-index) item t))))
 
 (defn choose-action []
-  (println "o__O?")
+  (println "\no__O?")
   (doseq [[k description] ACTIONS] (println (<< "[~{k}] ~{description}")))
   (get-choice))
 
@@ -77,9 +77,9 @@
   (println))
 
 (defn vertices-flood-proba
-  [bayes t evidence sample-size]
+  [bayes t e-map sample-size]
   (let [vertices-t (bn/filter-vertices-t bayes t)
-        flood-probs (sampled-proba bayes vertices-t evidence sample-size)]
+        flood-probs (sampled-proba bayes vertices-t e-map sample-size)]
 
     (println "Flood probabilities:")
     (doseq [[vertex f-prob] (into [] flood-probs)]
@@ -88,18 +88,34 @@
 (defn edge-blocked-proba [t])
 (defn path-free-proba [t])
 
-(defn proba-reason
-  [{persistence :persistence :as bayes} evidence]
 
+(defn b-node-and-bool
+  [b-net e]
+  [(bn/find-bayes-node b-net (:location e) (:t e))
+   (or (= (:evidence e) :flood) (= (:evidence e) :block))])
+
+(defn evidence-vec-to-map
+  [b-net e-vec]
+  (let [b-nodes-and-bools (map #(b-node-and-bool b-net %) e-vec)]
+    (into {} b-nodes-and-bools)))
+
+(defn print-e-map [e-map]
+  (println "\n---------------- Evidence ----------------")
+  (doseq [[k v] e-map] (println k "-" v))
+  (println "------------------------------------------\n"))
+
+(defn proba-reason
+  [bayes evidence]
   (doseq [[index evidence] QUERIES] (println index ">" evidence))
   (let [reason-index (get-int-choice)
         t (do (println "Time?") (get-int-choice))
         bayes-t (bn/b-net-with-t bayes t)
         evidence-map (evidence-vec-to-map bayes-t evidence)]
 
+    (print-e-map evidence-map)
     (case reason-index
 
-      1 (vertices-flood-proba bayes-t t evidence persistence)
+      1 (vertices-flood-proba bayes-t t evidence-map 10000)
       2 (edge-blocked-proba t)
       3 (path-free-proba t))))
 
@@ -124,16 +140,5 @@
           "p" (do (proba-reason bayes evidences) (recur evidences))
 
           "r" (recur [])
-          )
 
-        )
-
-
-      ;(when-not (= query "exit")
-      ;
-      ;  (query-user)
-      ;
-      ;  )
-      ;
-      ;
-      )))
+          )))))

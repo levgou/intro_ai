@@ -7,15 +7,10 @@
             [introai.utils.const :refer [INF]]
             ))
 
-(defrecord NodeInfo [name dead-line num-persons has-shelter]
+(defrecord NodeInfo [name dead-line num-persons has-shelter flood-prob]
   Object
   (toString [gs] (str "NodeInfo: " (select-keys gs [:name :flood-prob]))))
 (defmethod print-method NodeInfo [gs ^java.io.Writer w] (.write w (str gs)))
-
-(defrecord BayesNodeInfo [name flood-prob]
-  Object
-  (toString [gs] (str "BayesNodeInfo: " (into {} gs))))
-(defmethod print-method BayesNodeInfo [gs ^java.io.Writer w] (.write w (str gs)))
 
 (defrecord EdgeInfo [name start end weight]
   Object

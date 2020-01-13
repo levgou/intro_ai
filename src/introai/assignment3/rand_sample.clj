@@ -56,6 +56,7 @@
        count-true-for-keys))
 
 (defn sampled-proba
+  "Evidence map is mapping between bayes nodes to a bool value"
   [bayes query-vars evidence-map sample-size]
   (let [dists (sampled-dist bayes query-vars evidence-map sample-size)]
     (into {}

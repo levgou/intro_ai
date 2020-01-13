@@ -134,6 +134,21 @@
   [b-net t]
   (filter-nodes-t b-net filter-edges t))
 
+(defn edges-equal [g-edge b-edge]
+  (and (= (:start g-edge) (:src b-edge))
+       (= (:end g-edge) (:dest b-edge))))
+
+(defn find-bayes-node
+  [b-net g-node t]
+  (if-not (nil? (:start g-node))
+    ; Edge
+    (let [edges-t (filter-edges-t b-net t)]
+      (first (filter #(edges-equal g-node %) edges-t)))
+
+    ;Vertex
+    (let [vertices-t (filter-vertices-t b-net t)]
+      (first (filter #(= (:name g-node) (:name %)) vertices-t)))))
+
 (defn gen-new-b-vertex-nodes
   [{structure :structure t :t}]
   (let [vertex-nodes (filter-vertices structure)
