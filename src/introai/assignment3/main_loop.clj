@@ -4,6 +4,8 @@
     [clojure.core.strint :refer [<<]]
     [introai.assignment3.bayes-network :as bn]
     [introai.assignment3.rand-sample :refer [sampled-proba]]
+    [clojure.string :as str]
+    [introai.utils.collections :refer [pairwise-collection]]
     ))
 
 (def EVIDENCE_OPTIONS
@@ -45,6 +47,7 @@
 
 (defn get-choice [] (print ">>>") (flush) (read-line))
 (defn get-int-choice [] (Integer. (get-choice)))
+(defn get-list-choice [] (-> (get-choice) (str/split #" ")))
 
 (defn vertices-or-edges [evidence-index indexed-vertices indexed-edges]
   (let [to-print (if (<= evidence-index 2) indexed-vertices indexed-edges)]
@@ -85,8 +88,35 @@
     (doseq [[vertex f-prob] (into [] flood-probs)]
       (println (<< "~{vertex} - ~{f-prob}")))))
 
-(defn edge-blocked-proba [t])
-(defn path-free-proba [t])
+(defn edge-blocked-proba
+  [bayes t e-map sample-size]
+  (let [edges-t (bn/filter-edges-t bayes t)
+        block-probs (sampled-proba bayes edges-t e-map sample-size)]
+
+    (println "Block probabilities:")
+    (doseq [[vertex f-prob] (into [] block-probs)]
+      (println (<< "~{vertex} - ~{f-prob}")))))
+
+(defn get-path-edges []
+  (println "Write space separated vertex names in path, eg: 1 2 4")
+  (let [path-vs (get-list-choice)
+        path-edges (pairwise-collection path-vs)]
+    path-edges))
+
+(defn path-free-proba
+  [bayes t e-map sample-size]
+  (let [path-edges (get-path-edges)
+        edges-t (bn/filter-edges-t bayes t)
+        block-probs (sampled-proba bayes edges-t e-map sample-size)
+        relevant-edges (bn/filter-edges-by-src-dest path-edges edges-t)
+        path-block-proba (apply * (map block-probs relevant-edges))
+        path-free-p (- 1 path-block-proba)]
+
+    (println "Block probabilities of edges:")
+    (doseq [e relevant-edges]
+      (println (<< "~{e} - ~{(block-probs e)}")))
+
+    (println "Path free probability:" path-free-p)))
 
 
 (defn b-node-and-bool
@@ -105,7 +135,7 @@
   (println "------------------------------------------\n"))
 
 (defn proba-reason
-  [bayes evidence]
+  [bayes evidence sample-size]
   (doseq [[index evidence] QUERIES] (println index ">" evidence))
   (let [reason-index (get-int-choice)
         t (do (println "Time?") (get-int-choice))
@@ -115,12 +145,12 @@
     (print-e-map evidence-map)
     (case reason-index
 
-      1 (vertices-flood-proba bayes-t t evidence-map 10000)
-      2 (edge-blocked-proba t)
-      3 (path-free-proba t))))
+      1 (vertices-flood-proba bayes-t t evidence-map sample-size)
+      2 (edge-blocked-proba bayes-t t evidence-map sample-size)
+      3 (path-free-proba bayes-t t evidence-map sample-size))))
 
 (defn main-loop
-  [graph-desc bayes]
+  [graph-desc bayes sample-size]
 
   (let [nodes (-> graph-desc :props :nodes)
         edges (-> graph-desc :props :edges)]
@@ -137,7 +167,7 @@
 
           "l" (do (print-evidence evidences) (recur evidences))
 
-          "p" (do (proba-reason bayes evidences) (recur evidences))
+          "p" (do (proba-reason bayes evidences sample-size) (recur evidences))
 
           "r" (recur [])
 

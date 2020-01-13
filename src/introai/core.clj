@@ -8,8 +8,7 @@
 (def HELP-MESSAGE "
 Command line args:
    -f, --file-name      <Filename>             path to runtime file
-   -a, --alg            <ALG - NAME>           one of:   [minmax, semi-coop, coop]
-   -c --cutoff-depth    <POSITIVE-INTEGER>     depth of game tree allowed
+   -s, --sample-size    <number>               sample size that agrees with evidence
 ")
 
 (defn print-opts [opts]

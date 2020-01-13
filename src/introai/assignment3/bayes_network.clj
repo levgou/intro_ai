@@ -134,9 +134,21 @@
   [b-net t]
   (filter-nodes-t b-net filter-edges t))
 
+(defn edges-equal-src-dest [src dest b-edge]
+  (and (= src (:src b-edge))
+       (= dest (:dest b-edge))))
+
+(defn filter-edges-by-src-dest
+  [src-dest-vec edge-b-nodes]
+  (map
+    (fn [[src dest]] (first (filter #(edges-equal-src-dest src dest %) edge-b-nodes)))
+    src-dest-vec))
+
 (defn edges-equal [g-edge b-edge]
   (and (= (:start g-edge) (:src b-edge))
        (= (:end g-edge) (:dest b-edge))))
+
+
 
 (defn find-bayes-node
   [b-net g-node t]
