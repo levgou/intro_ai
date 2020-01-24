@@ -3,7 +3,7 @@
   (:require [clojure.core.strint :refer [<<]]
             [clojure.pprint :refer [print-table]]
             [introai.utils.const :as E]
-            [introai.assignment3.game-state :as gs]))
+            [introai.assignment4.game-state :as gs]))
 
 
 (defn spy [thing & others] (do
