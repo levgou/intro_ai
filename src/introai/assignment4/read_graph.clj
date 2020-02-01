@@ -5,7 +5,9 @@
             [loom.graph :as graph]
             [loom.alg :as alg]
             [introai.utils.graphs :as gutils]
-            [introai.assignment4.graph-description :as desc]))
+            [introai.utils.const :as E]
+            [introai.assignment4.graph-description :as desc]
+            ))
 
 (defn read-file-no-blank
   [file_abs]
@@ -23,12 +25,16 @@
   (filter #(str/starts-with? % start) collection))
 
 (defn parse-str-num
-  [pattern line]
-  (or (last (re-matches pattern line)) "0"))
+  ([pattern line]
+   (or (last (re-matches pattern line)) "0")))
 
 (defn parse-int
   [pattern line]
   (Integer. (parse-str-num pattern line)))
+
+(defn parse-float
+  [pattern line]
+  (Double. (parse-str-num pattern line)))
 
 (defn name-to-record
   [records]
@@ -38,6 +44,11 @@
   [g-list]
   (last (re-matches #".*(\d+)"
                     (first (filter-lines "#N" g-list)))))
+
+(defn parse-start-node
+  [g-list]
+  (last (re-matches #".*(\d+)"
+                    (first (filter-lines "#Start" g-list)))))
 
 (defn parse-node
   [node-line]
@@ -56,13 +67,16 @@
 
 (defn parse-edge
   [edge-line]
-  (desc/map->EdgeInfo
-    {
-     :name   (parse-str-num #"#E(\d+).*" edge-line)
-     :start  (parse-str-num #"#E\d+ (\d+).*" edge-line)
-     :end    (parse-str-num #"#E\d+ \d+ (\d+).*" edge-line)
-     :weight (parse-int #".*W(\d+)" edge-line)
-     }))
+  (let [blocked-proba (parse-float #".*B(\d+\.\d+).*" edge-line)]
+    (desc/map->EdgeInfo
+      {
+       :name        (parse-str-num #"#E(\d+).*" edge-line)
+       :start       (parse-str-num #"#E\d+ (\d+).*" edge-line)
+       :end         (parse-str-num #"#E\d+ \d+ (\d+).*" edge-line)
+       :weight      (parse-int #".*W(\d+).*" edge-line)
+       :blocked     (if (= 0.0 blocked-proba) E/BLOCKED-FALSE E/BLOCKED-UNKNOWN)
+       :block-proba blocked-proba
+       })))
 
 (defn parse-edges
   [g-list]
@@ -76,6 +90,7 @@
       {
        :num-nodes (parse-num-nodes g-list)
        :shelters  (vec (map :name (filter :has-shelter (vals node-names))))
+       :start     (parse-start-node g-list)
        :nodes     node-names
        :edges     (parse-edges g-list)
        })))
@@ -97,11 +112,11 @@
         (-> file_abs
             read-file-no-blank
             remove-comments
-            graph-props-from-list)]
+            graph-props-from-list
+            )]
 
-    (desc/make-dense
-      (desc/->GraphDescription
-        (graph-from-props g_props)
-        g_props
-        (desc/people-map (:nodes g_props))
-        ))))
+    (desc/->GraphDescription
+      (graph-from-props g_props)
+      g_props
+      (desc/people-map (:nodes g_props))
+      )))

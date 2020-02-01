@@ -5,9 +5,22 @@
             [loom.attr :as g-attr]
             [clojure.core.strint :refer [<<]]
             [introai.utils.collections :refer [pairwise-collection]]
-            [introai.utils.log :as log]
             [introai.assignment4.game-state :as gs]
-            ))
+            [introai.utils.const :as E]))
+
+
+(defn same-edge [src dest edge]
+  (= (sort [src dest]) (sort [(:start edge) (:end edge)])))
+
+
+(defn relevant-edge [g-desc state dest]
+  (let [agent-node (:agent-node state)]
+    (->> g-desc
+         :props
+         :edges
+         vals
+         (filter #(same-edge agent-node dest %))
+         first)))
 
 
 (defn edge-from-src-target-node [game-graph src-node target-node]
@@ -26,6 +39,15 @@
 
 (defn state-successors [graph-desc state]
   (successors graph-desc (:agent-node state)))
+
+(defn edge-unblocked? [graph-desc state dest]
+  (= E/BLOCKED-FALSE (:blocked (relevant-edge graph-desc state dest))))
+
+(defn state-unblocked-successors [graph-desc state]
+  (let [succ (state-successors graph-desc state)]
+    (filter
+      #(edge-unblocked? graph-desc state %)
+      succ)))
 
 (defn predecessors [graph-desc node]
   (graph/predecessors (:structure graph-desc) node))
@@ -50,13 +72,6 @@
 (defn shortest-path-len
   [g src dest]
   (second (shortest-path-dist g src dest)))
-
-(defn node-mid-edge?
-  ([graph-struct node]
-   (true? (g-attr/attr graph-struct node :mid-edge)))
-
-  ([graph-desc di-state agent]
-   (node-mid-edge? (:structure graph-desc) (gs/state-piece-of di-state agent :agent-node))))
 
 (defn edge-map [g [src dest]]
   {
@@ -101,13 +116,3 @@
 
 (defn weight [graph-desc src-int dest-int]
   (if (dense? graph-desc) 1 (graph/weight (:structure graph-desc) src-int dest-int)))
-
-(defn mid-nodes [graph-struct]
-  (filter (partial node-mid-edge? graph-struct) (graph/nodes graph-struct)))
-
-(defn mid-node-in-edge [graph-struct edge-vec]
-  (any?
-    (map (partial node-mid-edge? graph-struct) edge-vec)))
-
-(defn mid-edges [graph-struct]
-  (filter (partial mid-node-in-edge graph-struct) (graph/edges graph-struct)))

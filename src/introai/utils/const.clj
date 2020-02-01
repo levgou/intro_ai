@@ -13,3 +13,7 @@
 
 (def INF ##Inf)
 (def -INF (- ##Inf))
+
+(def BLOCKED-UNKNOWN :B?)
+(def BLOCKED-TRUE :B-T)
+(def BLOCKED-FALSE :B-F)

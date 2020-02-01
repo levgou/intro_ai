@@ -1,8 +1,11 @@
 (ns introai.core
   (:gen-class)
-  (:require [introai.assignment4.run-game :refer [run-from-opts opt-parser]]
-            [introai.assignment4.main-loop :refer [main-loop]]
-            [clojure.pprint :refer [pprint]]))
+  (:require
+    [clojure.pprint :refer [pprint]]
+    [introai.assignment4.read-graph :as rg]
+    [introai.assignment4.belief-space :as bs]
+
+    ))
 
 
 (def HELP-MESSAGE "
@@ -14,13 +17,22 @@ Command line args:
 (defn print-opts [opts]
   (println "Runtime configuration:")
   (println (apply str (repeat 100 "-")))
-  (pprint  opts)
+  (pprint opts)
   (println (apply str (repeat 100 "-"))))
 
 (defn -main
   [& args]
-  (let [opts (opt-parser args)]
-    (print-opts opts)
-    (if (:help opts)
-      (println HELP-MESSAGE)
-      (run-from-opts opts))))
+  (let
+    [
+     G (rg/read-graph-from-file "/Users/levgour/skool/introai/ass4/intro_ai/test/introai/resources/mini.aig")
+     B (bs/init-belief G)
+     ]
+    (bs/expand-init-belief B))
+
+
+  ;(let [opts (opt-parser args)]
+  ;  (print-opts opts)
+  ;(if (:help opts)
+  ;  (println HELP-MESSAGE)
+  ;(run-from-opts opts)
+  0)

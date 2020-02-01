@@ -36,15 +36,6 @@
 (defn name-n-state [agent]
   {(:name agent) (into {} (:state agent))})
 
-(defn end [graph-desc di-state]
-  (let [agents-info (into [] (map name-n-state [{:name "Alice" :state (:state1 di-state)}
-                                                {:name "Bob" :state (:state2 di-state)}]))]
-
-    (info "----------- E-N-D -----------")
-    (info "Remaining people: " (:remaining-people graph-desc))
-    (doseq [agent-info agents-info] (info agent-info))
-    (info "----------- D-N-E -----------")))
-
 (def SUMMARY-FIELDS [:score :num-expands :time :saved :remaining-people
                      :final-node :num-edges-traversed])
 
