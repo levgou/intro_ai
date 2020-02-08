@@ -7,6 +7,8 @@
     [nano-id.core :refer [nano-id]]
     [introai.utils.graphs :as gutils]
     [clojure.core.strint :refer [<<]]
+    [loom.graph :as graph]
+    [loom.alg :refer [topsort]]
     ))
 
 
@@ -21,8 +23,8 @@
 ; }
 ;
 
-; TODO: currently if init has uncertain edges -> BUG
-; TODO: need to test that arriving at a vertex with 2 uncertain edges works
+(def SHOW-CHILDREN false)
+
 
 (defrecord Belief [parent g-desc state children proba uncertain op]
   Object
@@ -33,12 +35,19 @@
                                    (assoc x :parent (-> x :parent :state :id)))
                           )
 
-                    (select-keys [:op :children])
+                    (select-keys (if SHOW-CHILDREN [:op :children] [:op]))
                     ))))
 
 (defmethod print-method Belief [x ^java.io.Writer w] (.write w (str x)))
 
 (defn certain? [belief] (not (:uncertain belief)))
+
+
+(defn belief-term-score [belief]
+  (if-not (-> belief :state gs/term?)
+    (throw (Exception. "Wot ?"))
+    (-> belief :state :saved)))
+
 
 (declare resolve-belief arrange-parent-child)
 (defn init-belief [g-desc]
@@ -71,7 +80,7 @@
 
     (-> belief
         (update-in [:g-desc :props :edges] merge edges-map)
-        (assoc :proba proba :op (<< "~{(:op belief)}->P(~{proba})}")))))
+        (assoc :proba proba :op (<< "~{(:op belief)}->P(~(format \"%.5f\" proba))}")))))
 
 
 (defn resolve-edges-proba [unresolved-edges belief]
@@ -180,19 +189,17 @@
   (let [children (:children uncertain-belief)
         expanded-children (into [] (map expand-belief children))]
 
-    (set-parent-children uncertain-belief expanded-children)
-    ))
+    (set-parent-children uncertain-belief expanded-children)))
 
+
+(def expander #(if (certain? %) (expand-belief %) (expand-certain-children %)))
 
 (defn expand-belief [belief]
   (if (-> belief :state gs/term?)
     belief
 
     (let [next-bs (next-beliefs belief)
-          x (inc 1)
-          expanded-next-bs (into [] (map
-                                      #(if (certain? %) (expand-belief %) (expand-certain-children %))
-                                      next-bs))]
+          expanded-next-bs (into [] (map expander next-bs))]
 
       (set-parent-children belief expanded-next-bs))))
 
@@ -202,6 +209,41 @@
     (expand-certain-children init-b)))
 
 
-(defn generate [g-desc state]
+(defn belief-tree-di-edges [{children :children :as belief}]
+  (if (empty? children)
+    []
 
-  )
+    (let [cur-edges (map #(vector % belief) children)
+          childrens-edges (apply concat (map belief-tree-di-edges children))]
+      (concat cur-edges childrens-edges))))
+
+
+(defn belief-tree-to-graph [belief]
+  (let [edges (belief-tree-di-edges belief)
+        g (apply graph/digraph edges)]
+    g))
+
+
+(defn calc-belief-score [b-graph calced-map belief]
+  (if (-> belief :state gs/term?)
+    (belief-term-score belief)
+
+    (let [predecessors (graph/predecessors b-graph belief)]
+      (if (certain? belief)
+        (apply max (map calced-map predecessors))
+        (apply + (map #(* (:proba %) (calced-map %)) predecessors))))))
+
+
+(defn calc-scores [b-graph top-order]
+  (reduce
+    (fn [calced belief]
+      (assoc calced belief (calc-belief-score b-graph calced belief)))
+    {}
+    top-order))
+
+
+(defn scored-graph [belief]
+  (let [bg (belief-tree-to-graph belief)
+        top-order (topsort bg)
+        score-index (calc-scores bg top-order)]
+    {:b-graph bg :score-index score-index :start-belief (last top-order)}))

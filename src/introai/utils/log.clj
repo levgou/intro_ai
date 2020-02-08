@@ -28,10 +28,10 @@
   (info (<< "  * (~{t} - ~{id} - Alice)> ~{(into {} alice-state)}"))
   (info-nl (<< "  * (~{t} - ~{id} - B_o_b)> ~{(into {} bob-state)}")))
 
-(defn turn [{t :time id :id :as di-state} agents-order]
-  (let [agent-name (:name (first agents-order))
-        agent-state (gs/state-piece-of di-state (first agents-order) :terminated)]
-    (info (<< "(~{t} - ~{id})> [~{agent-name}] is now playing with state [~{agent-state}]"))))
+;(defn turn [{t :time id :id :as di-state} agents-order]
+;  (let [agent-name (:name (first agents-order))
+;        agent-state (gs/state-piece-of di-state (first agents-order) :terminated)]
+;    (info (<< "(~{t} - ~{id})> [~{agent-name}] is now playing with state [~{agent-state}]"))))
 
 (defn name-n-state [agent]
   {(:name agent) (into {} (:state agent))})

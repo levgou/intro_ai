@@ -2,16 +2,13 @@
   (:gen-class)
   (:require
     [clojure.pprint :refer [pprint]]
-    [introai.assignment4.read-graph :as rg]
-    [introai.assignment4.belief-space :as bs]
-
+    [introai.assignment4.simulate :as sim]
     ))
 
 
 (def HELP-MESSAGE "
 Command line args:
    -f, --file-name      <Filename>             path to runtime file
-   -s, --sample-size    <number>               sample size that agrees with evidence
 ")
 
 (defn print-opts [opts]
@@ -22,17 +19,11 @@ Command line args:
 
 (defn -main
   [& args]
-  (let
-    [
-     G (rg/read-graph-from-file "/Users/levgour/skool/introai/ass4/intro_ai/test/introai/resources/mini.aig")
-     B (bs/init-belief G)
-     ]
-    (bs/expand-init-belief B))
 
-
+  (sim/run-simu "/Users/levgour/skool/introai/ass4/intro_ai/test/introai/resources/mini.aig")
   ;(let [opts (opt-parser args)]
   ;  (print-opts opts)
   ;(if (:help opts)
   ;  (println HELP-MESSAGE)
   ;(run-from-opts opts)
-  0)
+  0)+

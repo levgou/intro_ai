@@ -5,12 +5,16 @@
             [loom.attr :as g-attr]
             [clojure.core.strint :refer [<<]]
             [introai.utils.collections :refer [pairwise-collection]]
-            [introai.assignment4.game-state :as gs]
             [introai.utils.const :as E]))
 
 
 (defn same-edge [src dest edge]
   (= (sort [src dest]) (sort [(:start edge) (:end edge)])))
+
+(defn edge-names-at-node [edge-map node]
+  (->> edge-map
+       (filter #(or (= node (-> % second :start)) (= node (-> % second :end))))
+       (map first)))
 
 
 (defn relevant-edge [g-desc state dest]

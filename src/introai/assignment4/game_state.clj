@@ -14,7 +14,6 @@
    saved
    dead
    terminated
-   score
    remaining-people
    id
    ]
@@ -25,7 +24,7 @@
 
 
 (defn init-state [start-node remaining-people]
-  (GameState. 0 start-node 0 0 {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0} E/NOT-TERMINATED 0 remaining-people (nano-id 7)))
+  (GameState. 0 start-node 0 0 {E/DIED-WITH-AGENT 0 E/DIED-IN-CITY 0} E/NOT-TERMINATED remaining-people (nano-id 7)))
 
 (defn progress-time [edge state]
   (assoc state :time (+ (:time state) (:weight edge))))
