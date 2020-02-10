@@ -3,10 +3,9 @@
   (:require [clojure.string :as str]
             [clojure.java.io :as io]
             [loom.graph :as graph]
-            [loom.alg :as alg]
-            [introai.utils.graphs :as gutils]
             [introai.utils.const :as E]
             [introai.assignment4.graph-description :as desc]
+            [introai.utils.const :refer [INF]]
             ))
 
 (defn read-file-no-blank

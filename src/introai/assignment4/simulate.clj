@@ -5,6 +5,8 @@
     [introai.assignment4.read-graph :as rg]
     [introai.assignment4.belief-space :as bs]
     [loom.graph :as graph]
+    [loom.alg :refer [topsort]]
+    [introai.utils.const :refer [BLOCKED-TRUE BLOCKED-FALSE]]
     [introai.assignment4.game-state :as gs]
     [introai.utils.graphs :as gutils]))
 
@@ -44,6 +46,14 @@
 (defn b-term? [belief] (-> belief :state gs/term?))
 
 
+(defn max-next-belief-calc [b-graph score-index belief]
+  (->> belief
+       (graph/predecessors b-graph)
+       (map #(vector % (score-index %)))
+       (apply max-key second)
+       first))
+
+
 (defn max-next-belief [b-graph score-index belief]
   (->> belief
        (graph/predecessors b-graph)
@@ -75,13 +85,37 @@
 
           (recur next-b))))))
 
+(defn enumerate-belief-space [b-graph score-index]
+  (let [choose-act #(max-next-belief-calc b-graph score-index %)]
+      (doseq [b (topsort b-graph)]
+      (when (bs/certain? b)
+        (println [(score-index b) b] "->"
+                 (if (b-term? b) "TERM" ((juxt score-index identity) (choose-act b))))))))
+
+
+(defn scored-b-graph-from-file [file-path]
+  (-> file-path
+      rg/read-graph-from-file
+      bs/init-belief
+      bs/expand-init-belief
+      bs/scored-graph))
+
+
+(defn enumerate [file-path]
+  (let [{:keys [b-graph score-index]} (scored-b-graph-from-file file-path)]
+    (enumerate-belief-space b-graph score-index)))
+
 
 (defn run-simu [file-path]
   (let
-    [G (rg/read-graph-from-file file-path)
-     B (bs/init-belief G)
-     BX (bs/expand-init-belief B)
-     {:keys [b-graph score-index start-belief]} (bs/scored-graph BX)
+    [{:keys [b-graph score-index start-belief]} (scored-b-graph-from-file file-path)
 
      _ (println "[F]iiiirst: " (score-index start-belief) "-" start-belief "\n")
-     final-b (main-loop b-graph score-index start-belief)]))
+     final-b (main-loop b-graph score-index start-belief)]
+
+    (println "\n###### EDGES ######")
+    (->> final-b :g-desc :props :edges vals
+        (map #(select-keys % [:start :end :blocked]))
+         (map #(update % :blocked {BLOCKED-TRUE true BLOCKED-FALSE false}))
+         pprint)
+    ))

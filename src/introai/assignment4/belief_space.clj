@@ -46,7 +46,8 @@
 (defn belief-term-score [belief]
   (if-not (-> belief :state gs/term?)
     (throw (Exception. "Wot ?"))
-    (-> belief :state :saved)))
+    (- (-> belief :state :saved)
+       ({E/TERMINATED-SAFELY 0 E/TERMINATED-UNSAFELY 0.1} (-> belief :state :terminated)))))
 
 
 (declare resolve-belief arrange-parent-child)
@@ -64,7 +65,6 @@
 
 
 (defn resolve-rest [proba resolved [edge & others]]
-  ;(println proba "\n " resolved "\n " edge "\n " others "\n ")
   (if (nil? edge)
     [[proba resolved]]
 
